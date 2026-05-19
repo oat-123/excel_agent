@@ -142,14 +142,14 @@ def extract_keyword(text):
     text = original
     
     # 1. Remove prefixes from start
-    prefixes = ['หาข้อมูล', 'ดูข้อมูล', 'ค้นหา', 'หาเบอร์ของ', 'หาเบอร์', 'หา', 'ช่วยหา', 'ขอข้อมูล', 'ข้อมูล', 'นำข้อมูล']
+    prefixes = ['หาข้อมูล', 'ดูข้อมูล', 'ค้นหา', 'หาเบอร์ของ', 'หาเบอร์', 'หา', 'ช่วยหา', 'ขอข้อมูล', 'หาชื่อ']
     for p in sorted(prefixes, key=len, reverse=True):
         if text.startswith(p):
             text = text[len(p):].strip()
             break
             
     # 2. Remove suffixes from end (iteratively)
-    suffixes = ['จาก db', 'ใน db', 'จากฐานข้อมูล', 'ในฐานข้อมูล', 'ทำไมไม่มี', 'ทำไมหาไม่เจอ', 'อยู่ไหน', 'ครับ', 'ค่ะ', 'ครับผม', 'นะ', 'หน่อย', 'มั้ย', 'สิ', 'ให้หน่อย', 'ดูหน่อย', 'ไปใส่ในไฟล์', 'ลงในไฟล์', 'ลงไฟล์']
+    suffixes = ['จาก db', 'ใน db', 'จากฐานข้อมูล', 'ในฐานข้อมูล', 'ทำไมไม่มี', 'ทำไมหาไม่เจอ', 'จากไหน', 'ไหน']
     suffixes = sorted(suffixes, key=len, reverse=True)
     
     changed = True
@@ -163,7 +163,7 @@ def extract_keyword(text):
     # 3. If everything was stripped, return original (minus obvious prefixes)
     extracted = text if text else original.replace('หาข้อมูล', '').replace('จาก db', '').strip()
     # Remove common quote wrappers from user input like 'สุวรรณศรี' or "สุวรรณศรี"
-    extracted = re.sub(r"[\"'`’‘“”]+", "", extracted).strip()
+    extracted = re.sub(r"[\"'`''""]+", "", extracted).strip()
     return extracted
 
 
@@ -286,7 +286,7 @@ def extract_student_data(text):
         text = text.replace(pos_match.group(0), ' ')
     
     # Remove unwanted words
-    text = text.replace('เพิ่ม', '').replace('นักเรียน', '').replace('ลงในตาราง', '').replace('ลงในไฟล์', '').replace('ในฐานข้อมูล', '').replace('ใน db', '').replace('ในฐาน', '').replace('มี', '').strip()
+    text = text.replace('เพิ่ม', '').replace('นักเรียน', '').replace('ลงในตาราง', '').replace('ลงในไฟล์', '').replace('ในฐานข้อมูล', '')
     
     # Extract name using "ชื่อ" keyword
     name_match = re.search(r'ชื่อ\s+(\S+)\s+สกุล\s+(\S+)', text)
@@ -333,7 +333,7 @@ def process_command(user_command: str):
     command = None
     
     # Context-aware Save detection
-    if any(word in user_command for word in ["นำข้อมูล", "บันทึกข้อมูล", "เอาข้อมูล", "เซฟข้อมูล"]) and any(word in user_command for word in ["ใส่ในไฟล์", "ลงในไฟล์", "ไปใส่", "เซฟลง"]):
+    if any(word in user_command for word in ["นำข้อมูล", "บันทึกข้อมูล", "เอาข้อมูล", "เซฟข้อมูล"]) and any(word in user_command for word in ["เพิ่ม", "ลง", "ใส่"]):
         filename = extract_filename(user_command)
         if filename == "new_file.xlsx": filename = LAST_USED_FILE
         
@@ -346,7 +346,7 @@ def process_command(user_command: str):
             LAST_SEARCH_RESULTS = []
             command = actions
         else:
-             return {"status": "error", "message": "ไม่พบข้อมูลที่เคยค้นหาก่อนหน้าในความจำ Neural (ลองหาข้อมูลก่อนครับ)"}
+             return {"status": "error", "message": "ไม่พบข้อมูลที่เคยค้นหาก่อนหน้าในความจำ Neural (ลองหาข้อมูลก่อน)"}
 
     # Append last DB search results into a named Excel file (e.g. "เพิ่มใน students", "นำไปเพิ่มใน students")
     elif LAST_SEARCH_RESULTS and not is_db_context:
@@ -380,7 +380,7 @@ def process_command(user_command: str):
     elif any(word in user_command for word in ["หาข้อมูล", "ค้นหา", "หาเบอร์", "ดูข้อมูล"]):
         raw_keyword = extract_keyword(user_command)
         if raw_keyword and len(raw_keyword) > 1:
-            # Normalize to handle typos like 'เเละ' (double sara-e) -> 'และ' (sara-ae)
+            # Normalize to handle typos like 'เและ' (double sara-e) -> 'และ' (sara-ae)
             from tools.sheets_tools import normalize
             norm_keyword = normalize(raw_keyword)
             
@@ -704,7 +704,7 @@ def execute_single_command(command, user_command):
         data = command.get("data", {})
 
         file_info = ensure_file_path(filename)
-        full_path = file_info["path"]
+        full_path = os.path.join(DATA_FOLDER, file_info["filename"])
 
         push_log(f"[Excel] ตรวจสอบ {filename}")
         steps.append(f"เปิดไฟล์: {filename}")
@@ -834,7 +834,7 @@ def execute_single_command(command, user_command):
             push_log("[DB] ERROR: ดึงข้อมูลล้มเหลว หรือฐานข้อมูลว่างเปล่า", "error")
             return {
                 "status": "error",
-                "message": "ไม่สามารถดึงข้อมูลจาก Google Sheets ได้ หรือฐานข้อมูลว่างเปล่า ระบบจะไม่เขียนทับไฟล์เดิมเพื่อความปลอดภัย",
+                "message": "ไม่สามารถดึงข้อมูลจาก Google Sheets ได้ หรือฐานข้อมูลว่างเปล่า ระบบจะสร้าง db_cache.json ใหม่",
                 "steps": steps + ["ดึงข้อมูลล้มเหลว"]
             }
 
@@ -849,7 +849,7 @@ def execute_single_command(command, user_command):
             push_log(f"[Memory] บันทึก db_cache.json สำเร็จ ({len(rows)} รายการ) ✓")
             result = {
                 "status": "success",
-                "message": f"โหลดข้อมูลจากฐานข้อมูลเสร็จสิ้น บันทึกไว้ใน db_cache.json เรียบร้อยแล้ว (จำนวน {len(rows)} รายการ)",
+                "message": f"โหลดข้อมูลจากฐานข้อมูลเสร็จสิ้น บันทึกไว้ใน db_cache.json เรียบร้อย",
                 "rows": []
             }
         except Exception as e:
