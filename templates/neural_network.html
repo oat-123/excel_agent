@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S - Neural Network Interface</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='jarvis_favicon.png') }}?v=1.1">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='jarvis_favicon.png') }}?v=1.1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/neural_network.css') }}?v=5.3">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+</head>
+
+<body class="neural-body">
+    <div id="loading-screen">
+        <div class="loader-content">
+            <div class="robot-loader">
+                <div class="robot-head">
+                    <div class="robot-eye"></div>
+                </div>
+                <div class="robot-body">
+                    <div class="robot-core"></div>
+                </div>
+                <div class="robot-hands">
+                    <div class="hand left"></div>
+                    <div class="hand right"></div>
+                </div>
+            </div>
+            <div id="progress-text">NEURAL SYNC IN PROGRESS: 0%</div>
+            <div class="progress-bar-container">
+                <div id="progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="interface-overlay">
+        <div class="scanline"></div>
+        <div class="vignette"></div>
+        <div class="hud-side-bar side-l"></div>
+        <div class="hud-side-bar side-r"></div>
+        <div class="hud-container">
+
+            <!-- NEURAL UNIQUE TOP BAR -->
+            <div class="neural-top-bar">
+                <div class="neural-stat">
+                    <span class="stat-label">NEURAL ACTIVITY:</span>
+                    <span class="stat-value" id="neural-activity-val">0%</span>
+                </div>
+                <div class="neural-stat">
+                    <span class="stat-label">SYNAPSES:</span>
+                    <span class="stat-value" id="neural-synapse-count">0</span>
+                </div>
+                <div class="neural-stat">
+                    <span class="stat-label">UPTIME:</span>
+                    <span class="stat-value" id="neural-uptime-val">00:00:00</span>
+                </div>
+
+            </div>
+
+            <!-- MOBILE NAVIGATION PANEL TOGGLE -->
+            <button id="mobile-panel-toggle" style="display: none; position: fixed; top: 70px; right: 10px; z-index: 1000; background: rgba(10, 15, 26, 0.9); border: 1px solid var(--primary); color: var(--primary); padding: 8px 12px; border-radius: 4px; cursor: pointer; font-family: 'Orbitron'; font-size: 10px;">
+                <i class="fas fa-bars"></i> PANELS
+            </button>
+
+            <!-- ACTIVE MODULES (TOP LEFT) -->
+            <div class="hud-panel top-left" style="top: 100px; width: 220px; border-right: 2px solid var(--accent);">
+                <div class="panel-header" style="color: var(--accent);">ACTIVE MODULES</div>
+                <div class="panel-content" style="font-size: 11px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+                        <span style="color:var(--text);">Core NLP</span>
+                        <span id="mod-nlp" style="color:var(--accent);">ONLINE</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+                        <span style="color:var(--text);">Excel Parser</span>
+                        <span id="mod-excel" style="color:var(--accent);">ONLINE</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+                        <span style="color:var(--text);">Google Sheets</span>
+                        <span id="mod-sheets" style="color:#ffcc00;">CHECKING</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span style="color:var(--text);">Memory Vector</span>
+                        <span id="mod-memory" style="color:#ffcc00;">CHECKING</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CURRENT OBJECTIVE (MID LEFT) -->
+            <div class="hud-panel" style="top: 270px; left: 25px; width: 220px;">
+                <div class="panel-header">CURRENT OBJECTIVE</div>
+                <div class="panel-content" style="font-size: 11px;">
+                    <div id="objective-tag" style="color:var(--primary); margin-bottom: 5px;">> AWAITING_INPUT</div>
+                    <div id="objective-desc" style="color:var(--text-dim); font-size: 9px; line-height: 1.4;">
+                        System ready. Standing by for user commands, excel processing, or data queries.
+                    </div>
+                </div>
+            </div>
+
+            <!-- CORE RESOURCE PANEL (RIGHT) -->
+            <div class="hud-panel"
+                style="top: 100px; right: 25px; width: 180px; border-left: 2px solid var(--primary);">
+                <div class="panel-header" style="font-size: 9px;">CORE RESOURCES</div>
+                <div class="panel-content" style="font-size: 10px;">
+                    <div style="margin-bottom: 8px;">
+                        <span style="color:var(--text-dim);">CPU LOAD:</span>
+                        <span id="cpu-val" style="float:right; color:var(--primary);">0%</span>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <span style="color:var(--text-dim);">CPU TEMP:</span>
+                        <span id="temp-val" style="float:right; color:#ff4d4d;">0°C</span>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <span style="color:var(--text-dim);">RAM USAGE:</span>
+                        <span id="ram-val" style="float:right; color:var(--primary);">0%</span>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <span style="color:var(--text-dim);">DISK FREE:</span>
+                        <span id="disk-val" style="float:right; color:var(--primary);">0%</span>
+                    </div>
+                    <div style="padding-top: 5px; border-top: 1px solid rgba(0,242,255,0.1);">
+                        <span style="color:var(--text-dim);">REPO SIZE:</span>
+                        <span id="repo-val" style="float:right; color:#ffcc00;">0 MB</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NETWORK METRICS (MID RIGHT) -->
+            <div class="hud-panel" style="top: 290px; right: 25px; width: 180px;">
+                <div class="panel-header" style="color: var(--secondary);">NETWORK METRICS</div>
+                <div class="panel-content" style="font-size: 10px;">
+                    <div style="margin-bottom: 6px;">
+                        <span style="color:var(--text-dim);">LATENCY:</span>
+                        <span id="net-latency" style="float:right; color:var(--text);">--ms</span>
+                    </div>
+                    <div style="margin-bottom: 6px;">
+                        <span style="color:var(--text-dim);">BANDWIDTH:</span>
+                        <span id="net-bandwidth" style="float:right; color:var(--text);">--</span>
+                    </div>
+                    <div style="margin-bottom: 6px;">
+                        <span style="color:var(--text-dim);">PACKET LOSS:</span>
+                        <span id="net-loss" style="float:right; color:var(--accent);">0.00%</span>
+                    </div>
+                    <div>
+                        <span style="color:var(--text-dim);">API STATUS:</span>
+                        <span id="net-api" style="float:right; color:var(--accent);">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ARCHITECTURE PANEL (BOTTOM RIGHT) -->
+            <div class="hud-panel bottom-right" style="width: 250px; border-left: 2px solid var(--secondary);">
+                <div class="panel-header" style="color: var(--secondary);">SYSTEM ARCHITECTURE</div>
+                <div class="panel-content" style="font-size: 10px; color: var(--text-dim);">
+                    <div style="margin-bottom: 5px;">▸ Frontend: Flask + Three.js + GSAP</div>
+                    <div style="margin-bottom: 5px;">▸ Backend: Python 3.11 AI Agent</div>
+                    <div style="margin-bottom: 5px;">▸ Memory: Local JSON Vector Store</div>
+                    <div>▸ Inference: Gemini Pro Integration</div>
+                </div>
+            </div>
+
+            <!-- THOUGHT STREAM (BOTTOM LEFT) -->
+            <div class="hud-panel bottom-left" style="width: 350px;">
+                <div class="panel-header">
+                    <span>THOUGHT STREAM</span>
+                    <span onclick="clearNeuralLogs()" style="cursor:pointer; color:var(--text-dim); transition:0.2s;"
+                        onmouseover="this.style.color='#ff4d4d'" onmouseout="this.style.color='var(--text-dim)'"
+                        title="Clear Logs">✖</span>
+                </div>
+                <div class="panel-content data-stream" id="data-stream"></div>
+            </div>
+
+            <div id="canvas-container"></div>
+
+            <div id="neural-toast-container"
+                style="position: absolute; top: 80px; right: 25px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; pointer-events: none;">
+            </div>
+
+            <!-- HOLOGRAPHIC TARGET PROFILE -->
+            <div id="hologram-modal" class="hologram-modal">
+                <div class="hologram-backdrop"></div>
+                <div class="hologram-card">
+                    <div class="card-glitch-layer"></div>
+                    <div class="card-header">
+                        <div class="target-lock-icon">
+                            <svg viewBox="0 0 100 100">
+                                <path d="M 10 30 L 10 10 L 30 10" fill="none" stroke="var(--primary)" stroke-width="3" />
+                                <path d="M 70 10 L 90 10 L 90 30" fill="none" stroke="var(--primary)" stroke-width="3" />
+                                <path d="M 90 70 L 90 90 L 70 90" fill="none" stroke="var(--primary)" stroke-width="3" />
+                                <path d="M 30 90 L 10 90 L 10 70" fill="none" stroke="var(--primary)" stroke-width="3" />
+                                <circle cx="50" cy="50" r="10" fill="var(--accent)" class="target-dot" />
+                            </svg>
+                        </div>
+                        <div class="header-text">
+                            <div class="title decrypt-text" data-text="TARGET ACQUIRED">TARGET ACQUIRED</div>
+                            <div class="subtitle decrypt-text" id="target-id" data-text="ID: UNKNOWN">ID: UNKNOWN</div>
+                        </div>
+                        <button class="close-btn" onclick="window.closeHologram()">✖</button>
+                    </div>
+                    
+                    <div class="card-body" id="target-details">
+                        <!-- Details injected via JS -->
+                    </div>
+                    
+                    <div class="card-footer">
+                        <div class="status-bar">
+                            <div class="status-fill"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%;">
+                            <span style="font-size: 9px; color: var(--primary); white-space: nowrap; margin-bottom: 2px;">DECRYPTION COMPLETE</span>
+                            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+                                <div id="hologram-counter" style="font-family: 'Orbitron'; font-size: 10px; color: var(--accent); display: none;">1 / 1</div>
+                                <span id="process-time" style="font-size: 7px; color: rgba(0, 242, 255, 0.4); font-family: monospace; letter-spacing: 1px;">PROC: 0ms</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Navigation for multiple results -->
+                    <div id="hologram-nav" class="hologram-nav" style="display: none;">
+                        <button class="holo-nav-btn" onclick="window.prevHologram()">PREV</button>
+                        <div class="holo-nav-divider"></div>
+                        <button class="holo-nav-btn" onclick="window.nextHologram()">NEXT</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INPUT BOX -->
+            <div class="neural-input-container">
+                <div class="neural-input">
+                    <input type="text" id="neural-cmd" placeholder="ป้อนคำสั่งหรือคุยกับ J.A.R.V.I.S..."
+                        onkeypress="if(event.key === 'Enter') sendNeuralCmd()"
+                        oninput="if(window.update3DSuggestions) window.update3DSuggestions(this.value)">
+                    <button onclick="sendNeuralCmd()">SEND</button>
+                </div>
+            </div>
+
+        </div><!-- /.hud-container -->
+    </div><!-- /.interface-overlay -->
+
+    <script src="{{ url_for('static', filename='js/neural_network.js') }}"></script>
+    <script>
+        // ── Real Network Metrics ──────────────────────────────────────────
+        let _pingHistory = [];
+        let _failCount = 0;
+        let _totalPings = 0;
+
+        async function measureNetworkMetrics() {
+            const t0 = performance.now();
+            try {
+                const res = await fetch('/brain/objective', { cache: 'no-store' });
+                const latency = Math.round(performance.now() - t0);
+                const status = res.status;
+                _totalPings++;
+                _pingHistory.push(latency);
+                if (_pingHistory.length > 20) _pingHistory.shift();
+
+                // Estimate bandwidth from response size (rough)
+                const text = await res.text();
+                const bytes = new Blob([text]).size;
+                const bwKBps = ((bytes / 1024) / (latency / 1000)).toFixed(1);
+
+                const lossRate = (_failCount / Math.max(_totalPings, 1) * 100).toFixed(2);
+
+                const latEl = document.getElementById('net-latency');
+                const bwEl  = document.getElementById('net-bandwidth');
+                const lossEl = document.getElementById('net-loss');
+                const apiEl = document.getElementById('net-api');
+
+                if (latEl) latEl.textContent = `${latency}ms`;
+                if (bwEl)  bwEl.textContent  = `${bwKBps} KB/s`;
+                if (lossEl) {
+                    lossEl.textContent = `${lossRate}%`;
+                    lossEl.style.color = parseFloat(lossRate) > 5 ? '#ff4d4d' : 'var(--accent)';
+                }
+                if (apiEl) {
+                    apiEl.textContent = `${status} OK`;
+                    apiEl.style.color = status === 200 ? 'var(--accent)' : '#ff4d4d';
+                }
+            } catch (e) {
+                _failCount++;
+                _totalPings++;
+                const apiEl = document.getElementById('net-api');
+                if (apiEl) { apiEl.textContent = 'ERROR'; apiEl.style.color = '#ff4d4d'; }
+            }
+        }
+
+        setInterval(measureNetworkMetrics, 3000);
+        measureNetworkMetrics();
+
+        // ── Active Modules Status ─────────────────────────────────────────
+        async function updateModuleStatus() {
+            try {
+                const res = await fetch('/brain/status');
+                const data = await res.json();
+
+                // Memory Vector: online if synapse_load > 0
+                const memEl = document.getElementById('mod-memory');
+                if (memEl) {
+                    const synced = (data.synapse_load || 0) > 0;
+                    memEl.textContent = synced ? 'SYNCED' : 'EMPTY';
+                    memEl.style.color = synced ? 'var(--accent)' : '#ffcc00';
+                }
+
+                // Google Sheets: online if knowledge_size_kb > 0 (brain has learned)
+                const sheetsEl = document.getElementById('mod-sheets');
+                if (sheetsEl) {
+                    const active = (data.knowledge_size_kb || 0) > 0;
+                    sheetsEl.textContent = active ? 'ONLINE' : 'STANDBY';
+                    sheetsEl.style.color = active ? 'var(--accent)' : '#ffcc00';
+                }
+            } catch (e) {
+                const sheetsEl = document.getElementById('mod-sheets');
+                if (sheetsEl) { sheetsEl.textContent = 'ERROR'; sheetsEl.style.color = '#ff4d4d'; }
+            }
+        }
+
+        setInterval(updateModuleStatus, 5000);
+        updateModuleStatus();
+    </script>
+    <script>
+        // Attach click handler for mobile panel toggle
+        document.addEventListener('DOMContentLoaded', () => {
+            const toggle = document.getElementById('mobile-panel-toggle');
+            if (toggle) {
+                toggle.addEventListener('click', window.togglePanels);
+            }
+        });
+        
+        async function sendNeuralCmd() {
+            const startTime = Date.now();
+            const input = document.getElementById('neural-cmd');
+            const button = input.nextElementSibling;
+            const cmd = input.value.trim();
+            if (!cmd) return;
+
+            if (window.injectSignal) window.injectSignal();
+            if (window.addStreamLine) window.addStreamLine(`User: ${cmd}`);
+            
+            // Trigger 3D Data Flow
+            if (window.animateDataFlow) {
+                window.animateDataFlow('CORE');
+                const lowCmd = cmd.toLowerCase();
+                if (lowCmd.includes('db') || lowCmd.includes('ฐานข้อมูล')) setTimeout(() => window.animateDataFlow('DB'), 400);
+                if (lowCmd.includes('ไฟล์') || lowCmd.includes('excel')) setTimeout(() => window.animateDataFlow('EXCEL'), 400);
+                if (cmd.length > 10) setTimeout(() => window.animateDataFlow('LLM'), 800);
+            }
+            
+            if (window.update3DSuggestions) window.update3DSuggestions('');
+
+            input.disabled = true;
+            button.disabled = true;
+            button.innerText = 'PROCESSING...';
+            button.style.opacity = '0.5';
+            
+            if (window.startProcessing) window.startProcessing();
+            input.value = '';
+
+            try {
+                const res = await fetch('/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: cmd })
+                });
+                const data = await res.json();
+                const processTime = Date.now() - startTime;
+                
+                if (window.stopProcessing) window.stopProcessing();
+                input.disabled = false;
+                button.disabled = false;
+                button.innerText = 'SEND';
+                button.style.opacity = '1';
+                input.focus();
+
+                if (window.showResponse) window.showResponse(data, processTime);
+            } catch (err) {
+                if (window.stopProcessing) window.stopProcessing();
+                input.disabled = false;
+                button.disabled = false;
+                button.innerText = 'SEND';
+                button.style.opacity = '1';
+                if (window.addStreamLine) window.addStreamLine("Critical: Neural sync error.", "error");
+            }
+        }
+
+        // ── Live log polling → Thought Stream ────────────────────────────
+        // Polls /logs every 350ms and pipes each message into addStreamLine.
+        // Tag-based colour mapping mirrors the Chat mode colour scheme.
+        const _neuralSeenLogs = new Set();
+        const _NEURAL_LOG_TYPES = {
+            '[Excel]':  'info',
+            '[DB]':     'info',
+            '[Brain]':  'bot',
+            '[Memory]': 'info',
+            '[Done]':   'bot',
+            '[System]': 'info',
+            '[Intent]': 'info',
+            'ERROR':    'error',
+        };
+
+        setInterval(async () => {
+            try {
+                const res = await fetch('/logs');
+                if (!res.ok) return;
+                const logs = await res.json();
+                logs.forEach(msg => {
+                    if (_neuralSeenLogs.has(msg)) return;
+                    _neuralSeenLogs.add(msg);
+                    if (_neuralSeenLogs.size > 80) {
+                        const first = _neuralSeenLogs.values().next().value;
+                        _neuralSeenLogs.delete(first);
+                    }
+                    // Determine stream type from tag
+                    let streamType = 'info';
+                    for (const [tag, t] of Object.entries(_NEURAL_LOG_TYPES)) {
+                        if (msg.includes(tag)) { streamType = t; break; }
+                    }
+                    if (window.addStreamLine) window.addStreamLine(msg, streamType, false);
+                });
+            } catch(e) {}
+        }, 350);
+    </script>
+</body>
+
+</html>

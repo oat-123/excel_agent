@@ -1,0 +1,45 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+credentials.json
+*.pem
+*.key
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Runtime data and generated local state
+data/uploads/
+data/db_cache.json
+data/~$*.xlsx
+brain/*.json
+memory/*.json
+search_results.json
+query.txt
+
+# Build artifacts
+build/
+dist/
+*.spec
+
+# Node/Electron artifacts
+node_modules/
+electron-app/node_modules/
+electron-app/dist/
+electron-app/out/
+.kilo/node_modules/
+.kilo/package-lock.json
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>J.A.R.V.I.S - AI Assistant</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.tailwindcss.min.css">
+    <style>
+        :root {
+            --neural-blue: #00f2ff;
+            --neural-purple: #8a2be2;
+            --brain-dark: #05070a;
+            --brain-medium: #0a0f1a;
+            --brain-light: #131b2e;
+            --panel-bg: rgba(13, 17, 23, 0.9);
+            --accent-color: #00f2ff;
+            --text-color: #e2e8f0;
+            --user-msg: #1e293b;
+            --bot-msg: #0f172a;
+            --border: rgba(0, 242, 255, 0.2);
+            --glass: rgba(255, 255, 255, 0.03);
+            --success: #10b981;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%; min-height: 100%; margin: 0; padding: 0;
+            overflow-x: hidden; overflow-y: auto;
+            background-color: var(--brain-dark);
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            color: var(--text-color);
+        }
+
+        /* ── Mode Toggle (top-right, single location) ── */
+        .mode-toggle {
+            position: fixed;
+            top: 16px;
+            right: 20px;
+            z-index: 10002;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(10, 15, 26, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            padding: 7px 16px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.12);
+            user-select: none;
+            transition: box-shadow 0.2s;
+        }
+        .mode-toggle:hover { box-shadow: 0 0 28px rgba(0, 242, 255, 0.28); }
+        .mode-toggle-icon { font-size: 13px; }
+        .mode-toggle-text {
+            font-family: 'Orbitron', 'Segoe UI', sans-serif;
+            font-size: 10px;
+            letter-spacing: 1px;
+            color: var(--accent-color);
+            white-space: nowrap;
+        }
+        .toggle-switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--brain-medium);
+            transition: .4s; border-radius: 22px;
+            border: 1px solid var(--neural-blue);
+        }
+        .slider:before {
+            position: absolute; content: "";
+            height: 16px; width: 16px; left: 2px; bottom: 2px;
+            background-color: var(--neural-blue);
+            transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--neural-purple); }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        /* ── Neural Container (default: active / fullscreen) ── */
+        #neural-container {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: none; background: black;
+            z-index: 9000; overflow: hidden;
+        }
+        #neural-container.active { display: block; }
+        #neural-iframe { width: 100%; height: 100%; border: none; outline: none; }
+
+        /* ── Chat Layout ── */
+        .main-container {
+            display: none; width: 100%; min-height: 100vh;
+            padding: 20px; padding-top: 70px; gap: 20px;
+            box-sizing: border-box;
+            background-image: radial-gradient(circle at 50% 50%, #111827 0%, #05070a 100%);
+        }
+        .main-container.active { display: flex; }
+        .main-container.column-layout { flex-direction: column; }
+
+        .chat-section {
+            flex: 1; display: flex; flex-direction: column;
+            background: var(--panel-bg); border: 1px solid var(--border);
+            border-radius: 20px; backdrop-filter: blur(15px);
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            overflow: hidden; min-width: 0;
+        }
+        .tab-navigation { display: flex; gap: 5px; flex: 1; }
+        .tab-btn {
+            background: none; border: 1px solid var(--border);
+            color: var(--text-color); padding: 6px 12px;
+            border-radius: 6px; cursor: pointer;
+            font-size: 0.8rem; transition: all 0.3s; flex: 1;
+        }
+        .tab-btn.active { background: var(--accent-color); color: black; border-color: var(--accent-color); }
+        .tab-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+        .tab-pane { display: none; flex: 1; overflow: auto; padding: 15px; }
+        .tab-pane.active { display: flex; flex-direction: column; }
+        .data-browser { display: flex; flex-direction: column; height: 100%; }
+        .brain-status { display: flex; flex-direction: column; height: 100%; }
+        .section-header {
+            padding: 15px 20px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 12px;
+        }
+        .section-header h2 { font-size: 1rem; letter-spacing: 1.5px; color: var(--accent-color); text-transform: uppercase; }
+
+        #chat-log {
+            flex: 1; overflow-y: auto; padding: 20px;
+            display: flex; flex-direction: column; gap: 15px;
+        }
+        #chat-log::-webkit-scrollbar { width: 5px; }
+        #chat-log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+        .msg {
+            max-width: 85%; padding: 12px 18px; border-radius: 12px;
+            font-size: 0.95rem; line-height: 1.4; animation: slideIn 0.3s ease;
+        }
+        .user-msg { align-self: flex-end; background: var(--user-msg); color: white; border-bottom-right-radius: 2px; }
+        .bot-msg { align-self: flex-start; background: var(--bot-msg); border: 1px solid var(--border); border-bottom-left-radius: 2px; }
+        .system-msg { align-self: center; background: rgba(0,242,255,0.05); color: var(--accent-color); font-size: 0.8rem; border: 1px dashed var(--border); padding: 6px 12px; border-radius: 8px; margin: 5px 0; max-width: 95%; text-align: left; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .input-box { padding: 20px; display: flex; gap: 10px; background: rgba(0,0,0,0.2); }
+        .input-box input[type="text"] {
+            flex: 1; background: var(--glass); border: 1px solid var(--border);
+            border-radius: 10px; padding: 12px; color: white; outline: none;
+        }
+        .input-box button {
+            background: var(--glass); border: 1px solid var(--accent-color);
+            color: var(--accent-color); padding: 0 20px;
+            border-radius: 10px; cursor: pointer; transition: 0.2s;
+        }
+        .input-box button:hover { background: rgba(0,242,255,0.1); }
+        .upload-btn { background: var(--glass); border: 1px solid #10b981; color: #10b981; padding: 10px 15px; border-radius: 10px; cursor: pointer; }
+
+        /* Preview */
+        .preview-section {
+            display: flex; flex-direction: column;
+            background: var(--panel-bg); border: 1px solid var(--border);
+            border-radius: 20px; overflow: hidden;
+            width: 0; min-width: 0; flex-shrink: 0; transition: width 0.4s ease;
+        }
+        .preview-section.expanded { width: 450px; }
+        .preview-section.collapsed { display: none; }
+        .preview-body { flex: 1; overflow: auto; }
+        #students-table {
+             width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+         #students-table thead th { position: sticky; top: 0; background: #111827; color: var(--accent-color); padding: 12px; text-align: left; border-bottom: 2px solid var(--border); }
+         #students-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #cbd5e1; }
+         
+         /* Checkmark indicator for selected rows */
+         .select-check {
+             position: absolute;
+             right: 4px;
+             bottom: 4px;
+             width: 16px;
+             height: 16px;
+             border-radius: 50%;
+             background: rgba(16, 185, 129, 0.2);
+             border: 1.5px solid rgba(16, 185, 129, 0.5);
+             font-size: 9px;
+             color: var(--success);
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             opacity: 0;
+             transition: opacity 0.2s, transform 0.2s;
+             pointer-events: none;
+             transform: scale(0.7);
+         }
+.select-check.visible { opacity: 1; transform: scale(1); background: rgba(16, 185, 129, 0.25); border-color: var(--success); box-shadow: 0 0 6px rgba(16, 185, 129, 0.4); }
+          .selected-row { background: rgba(16, 185, 129, 0.08) !important; }
+          .preview-row td:first-child { position: relative; width: 30px; cursor: pointer; }
+          .preview-row td:first-child:hover { background: rgba(0, 242, 255, 0.05); }
+
+        /* Typing Indicator */
+        .typing-indicator {
+            display: none; padding: 12px 18px; background: var(--bot-msg);
+            border-radius: 15px; border-bottom-left-radius: 2px;
+            margin-bottom: 15px; width: fit-content; border: 1px solid var(--border);
+        }
+        .typing-indicator.active { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 6px; height: 6px; background: var(--accent-color); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+        /* Processing Overlay */
+        .processing-overlay {
+            position: fixed; inset: 0; background: rgba(5,7,10,0.9);
+            backdrop-filter: blur(10px); display: none;
+            flex-direction: column; align-items: center; justify-content: center; z-index: 10000;
+        }
+        .processing-overlay.active { display: flex; }
+        .dna-loader {
+            width: 100px; height: 100px; border: 3px solid transparent;
+            border-top: 3px solid var(--accent-color); border-radius: 50%;
+            animation: spin 1s linear infinite; position: relative;
+        }
+        .dna-loader::after {
+            content: ''; position: absolute; inset: 10px;
+            border: 3px solid transparent; border-bottom: 3px solid var(--neural-purple);
+            border-radius: 50%; animation: spin 2s linear infinite reverse;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .processing-text {
+            margin-top: 30px; font-family: 'Orbitron', sans-serif;
+            color: var(--accent-color); letter-spacing: 5px;
+            text-shadow: 0 0 10px var(--accent-color); font-size: 14px;
+        }
+
+        /* Autocomplete */
+        .autocomplete-box {
+            position: absolute; bottom: 100%; left: 0; right: 0;
+            background: rgba(10,15,26,0.97); border: 1px solid var(--border);
+            border-bottom: none; border-radius: 10px 10px 0 0;
+            max-height: 180px; overflow-y: auto; z-index: 100; display: none;
+        }
+        .autocomplete-box.visible { display: block; }
+        .autocomplete-item {
+            padding: 9px 14px; font-size: 0.85rem; color: var(--text-color);
+            cursor: pointer; border-bottom: 1px solid rgba(0,242,255,0.06); transition: background 0.15s;
+        }
+        .autocomplete-item:hover, .autocomplete-item.selected { background: rgba(0,242,255,0.1); color: var(--accent-color); }
+
+        /* Responsive */
+        @media (max-width: 1024px) { .preview-section.expanded { width: 350px; } .chat-section { min-width: 300px; } }
+        @media (max-width: 768px) {
+            .main-container { flex-direction: column; padding: 10px; padding-top: 65px; }
+            .mode-toggle { top: 10px; right: 10px; padding: 6px 12px; }
+            .preview-section { width: 100% !important; min-width: 100%; max-height: 300px; }
+            .preview-section.expanded { width: 100% !important; }
+            .chat-section { min-width: 100%; }
+            .input-box { padding: 10px; }
+            .input-box input[type="text"] { padding: 10px; font-size: 14px; }
+            #chat-log { padding: 10px; }
+            .msg { max-width: 95%; }
+        }
+        @media (max-width: 480px) {
+            .main-container { padding: 5px; padding-top: 60px; }
+            .mode-toggle { top: 8px; right: 8px; padding: 5px 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ── Single Toggle (top-right corner) ── -->
+    <!-- Neural = checked/active, Chat = unchecked -->
+    <div class="mode-toggle" onclick="toggleMode()" title="สลับโหมด Neural / Chat">
+        <span class="mode-toggle-icon">🧠</span>
+        <label class="toggle-switch" style="pointer-events:none;">
+            <input type="checkbox" id="mode-switch" checked>
+            <span class="slider"></span>
+        </label>
+        <span class="mode-toggle-text" id="mode-label">NEURAL</span>
+    </div>
+
+    <!-- Neural Network Interface — DEFAULT (active) -->
+    <div id="neural-container" class="active">
+        <iframe src="/neural-network" id="neural-iframe" scrolling="no"></iframe>
+    </div>
+
+    <!-- Chat Interface — hidden by default -->
+    <div class="main-container" id="main-container">
+        <div class="chat-section">
+            <div class="section-header">
+                <div style="width:8px;height:8px;background:#10b981;border-radius:50%;box-shadow:0 0 8px #10b981;"></div>
+                <div class="tab-navigation">
+                    <button class="tab-btn active" data-tab="chat">💬 Chat</button>
+                    <button class="tab-btn" data-tab="data">📊 Data</button>
+                    <button class="tab-btn" data-tab="status">🧠 Status</button>
+                </div>
+            </div>
+            <div class="tab-content">
+
+                <!-- Chat Tab -->
+                <div id="chat-tab" class="tab-pane active">
+                    <div id="chat-log">
+                        <div class="msg bot-msg">เชื่อมต่อระบบเรียบร้อย... พร้อมรับคำสั่งจัดการ Excel ครับ</div>
+                    </div>
+                    <div class="typing-indicator" id="typing-indicator">
+                        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+                    </div>
+                    <div class="input-box" style="position:relative;">
+                        <div id="autocomplete-box" class="autocomplete-box"></div>
+                        <input type="file" id="file-upload" accept=".xlsx,.xls,.csv,.json" style="display:none;">
+                        <button class="upload-btn" onclick="document.getElementById('file-upload').click()">
+                            <i class="fas fa-upload"></i> อัพโหลด
+                        </button>
+                        <input type="text" id="cmd-input" placeholder="ป้อนคำสั่ง..." autocomplete="off"
+                            onkeypress="if(event.key==='Enter') execute()"
+                            oninput="fetchSuggestions(this.value)"
+                            onkeydown="handleSuggestionKey(event)">
+                        <button onclick="execute()"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+
+                <!-- Data Tab -->
+                <div id="data-tab" class="tab-pane">
+                    <div class="data-browser">
+                        <h3 style="color:var(--accent-color);margin-bottom:15px;">📊 ฐานข้อมูลนักเรียน</h3>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:15px;">
+                            <input type="text" id="search-input" placeholder="ค้นหา..." style="padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--brain-medium);color:var(--text-color);">
+                            <select id="rank-filter" style="padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--brain-medium);color:var(--text-color);">
+                                <option value="">ทั้งหมด</option>
+                                <option value="นนร.">นนร.</option>
+                                <option value="พ.ต.">พ.ต.</option>
+                                <option value="ร.อ.">ร.อ.</option>
+                            </select>
+                            <button id="apply-filters" style="padding:8px 12px;background:var(--accent-color);border:none;border-radius:6px;color:black;cursor:pointer;">ค้นหา</button>
+                        </div>
+                        <table id="students-table" class="display" style="width:100%;">
+                            <thead><tr>
+                                <th></th>
+                                <th>ลำดับ</th><th>ยศ</th><th>ชื่อ</th><th>สกุล</th>
+                                <th>ชั้นปี</th><th>ตำแหน่ง</th><th>สังกัด</th><th>เบอร์โทร</th>
+                            </tr></thead>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Status Tab -->
+                <div id="status-tab" class="tab-pane">
+                    <div class="brain-status">
+                        <h3 style="color:var(--accent-color);margin-bottom:15px;">🧠 สถานะระบบ</h3>
+                        <div style="display:grid;gap:10px;">
+                            <div style="background:var(--brain-medium);padding:15px;border-radius:10px;border:1px solid var(--border);">
+                                <div style="color:var(--accent-color);font-weight:bold;">⏱ Uptime</div>
+                                <div id="uptime-display" style="font-family:monospace;margin-top:5px;">Loading...</div>
+                            </div>
+                            <div style="background:var(--brain-medium);padding:15px;border-radius:10px;border:1px solid var(--border);">
+                                <div style="color:var(--accent-color);font-weight:bold;">⚡ Neural Activity</div>
+                                <div id="activity-display" style="font-family:monospace;margin-top:5px;">Loading...</div>
+                            </div>
+                            <div style="background:var(--brain-medium);padding:15px;border-radius:10px;border:1px solid var(--border);">
+                                <div style="color:var(--accent-color);font-weight:bold;">🔗 Synapse Load</div>
+                                <div id="synapse-display" style="font-family:monospace;margin-top:5px;">Loading...</div>
+                            </div>
+                            <div style="background:var(--brain-medium);padding:15px;border-radius:10px;border:1px solid var(--border);">
+                                <div style="color:var(--accent-color);font-weight:bold;">📦 Knowledge Size</div>
+                                <div id="knowledge-display" style="font-family:monospace;margin-top:5px;">Loading...</div>
+                            </div>
+                            <div style="background:var(--brain-medium);padding:15px;border-radius:10px;border:1px solid var(--border);">
+                                <div style="color:var(--accent-color);font-weight:bold;">🏷 Entity Types</div>
+                                <div id="entity-display" style="font-family:monospace;font-size:0.8rem;margin-top:5px;line-height:1.8;">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div><!-- /.tab-content -->
+        </div><!-- /.chat-section -->
+
+        <!-- Preview Panel -->
+        <div class="preview-section" id="preview-section">
+            <div class="section-header">
+                <h2>Data Insight</h2>
+                <div style="flex:1;"></div>
+                <button onclick="toggleChart()" id="chart-toggle-btn"
+                    style="background:none;border:1px solid var(--border);color:var(--accent-color);font-size:10px;padding:2px 8px;border-radius:4px;cursor:pointer;">
+                    SHOW CHART
+                </button>
+            </div>
+            <div id="chart-container" style="display:none;padding:20px;border-bottom:1px solid var(--border);">
+                <canvas id="insight-chart"></canvas>
+            </div>
+            <div class="preview-body" id="preview-body">
+                <div style="height:100%;display:flex;align-items:center;justify-content:center;opacity:0.2;">
+                    <p>รอดำเนินการแสดงข้อมูลไฟล์...</p>
+                </div>
+            </div>
+        </div>
+    </div><!-- /.main-container -->
+
+    <!-- Processing Overlay -->
+    <div class="processing-overlay" id="processing-overlay">
+        <div class="dna-loader"></div>
+        <div class="processing-text" id="processing-step">ANALYZING NEURAL DATA...</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+
+        // ── Mode Toggle ──────────────────────────────────────────────────
+        // checked  = Neural mode (default)
+        // unchecked = Chat mode
+        function toggleMode() {
+            const sw     = document.getElementById('mode-switch');
+            const neural = document.getElementById('neural-container');
+            const chat   = document.getElementById('main-container');
+            const label  = document.getElementById('mode-label');
+            const icon   = document.querySelector('.mode-toggle-icon');
+
+            sw.checked = !sw.checked;
+
+            if (sw.checked) {
+                // → Neural mode
+                neural.classList.add('active');
+                chat.classList.remove('active');
+                label.textContent = 'NEURAL';
+                icon.textContent  = '🧠';
+            } else {
+                // → Chat mode
+                neural.classList.remove('active');
+                chat.classList.add('active');
+                label.textContent = 'CHAT';
+                icon.textContent  = '💬';
+            }
+        }
+
+        // ── Drag & Drop upload ───────────────────────────────────────────
+        window.addEventListener('dragover',  e => { e.preventDefault(); e.stopPropagation(); document.body.style.outline = '2px dashed var(--accent-color)'; });
+        window.addEventListener('dragleave', e => { e.preventDefault(); e.stopPropagation(); document.body.style.outline = ''; });
+        window.addEventListener('drop', async e => {
+            e.preventDefault(); e.stopPropagation();
+            document.body.style.outline = '';
+            const files = e.dataTransfer.files;
+            if (files.length > 0) handleFileUpload(files[0]);
+        });
+
+        async function handleFileUpload(file) {
+            const overlay = document.getElementById('processing-overlay');
+            const stepTxt = document.getElementById('processing-step');
+            overlay.classList.add('active');
+            stepTxt.textContent = 'Uploading and analyzing template...';
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const res  = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                overlay.classList.remove('active');
+                if (data.status === 'success') {
+                    addMsg('bot', `เรียนรู้โครงสร้างจากไฟล์ ${file.name} เรียบร้อยแล้วครับ!`);
+                    if (data.preview) updatePreview(data.preview);
+                } else {
+                    addMsg('bot', `เกิดข้อผิดพลาด: ${data.error}`);
+                }
+            } catch (err) {
+                overlay.classList.remove('active');
+                addMsg('bot', 'Upload failed: ' + err.message);
+            }
+        }
+
+        // ── Execute command ──────────────────────────────────────────────
+        function scrollToBottom() {
+            const log = document.getElementById('chat-log');
+            if (log) log.scrollTop = log.scrollHeight;
+        }
+
+        async function execute() {
+            const input = document.getElementById('cmd-input');
+            const cmd   = input.value.trim();
+            if (!cmd) return;
+            addMsg('user', cmd);
+            input.value = '';
+            document.getElementById('autocomplete-box').classList.remove('visible');
+
+            const typing  = document.getElementById('typing-indicator');
+            const overlay = document.getElementById('processing-overlay');
+            const isComplex = /สร้าง|เพิ่ม|รวม|แปลง|สรุป|สถิติ|create|add|merge|convert|summarize|stats/i.test(cmd);
+            if (isComplex) overlay.classList.add('active');
+            else           typing.classList.add('active');
+            scrollToBottom();
+
+            try {
+                const res  = await fetch('/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: cmd })
+                });
+                const data = await res.json();
+                typing.classList.remove('active');
+                overlay.classList.remove('active');
+
+                if (data.status === 'success') {
+                    addMsg('bot', data.message || 'ดำเนินการเรียบร้อยครับ');
+                    if (data.preview || data.rows) updatePreview(data.preview || data.rows);
+                    if (data.summary || data.statistics) renderChart(data.summary || data.statistics);
+                } else {
+                    addMsg('bot', 'ขออภัยครับ เกิดข้อผิดพลาด: ' + (data.error || data.message || 'Unknown error'));
+                }
+                updateHUD();
+            } catch (err) {
+                typing.classList.remove('active');
+                overlay.classList.remove('active');
+                addMsg('bot', 'ไม่สามารถเชื่อมต่อกับระบบได้ครับ: ' + err.message);
+            }
+        }
+
+        // ── Chart ────────────────────────────────────────────────────────
+        let myChart = null;
+        function renderChart(insightData) {
+            const ctx = document.getElementById('insight-chart').getContext('2d');
+            document.getElementById('chart-container').style.display = 'block';
+            if (myChart) myChart.destroy();
+            let labels = [], values = [];
+            if (insightData.text_summary) {
+                labels = Object.keys(insightData.text_summary);
+                values = labels.map(l => insightData.text_summary[l].unique_values);
+            } else if (insightData.missing_data) {
+                labels = Object.keys(insightData.missing_data);
+                values = labels.map(l => insightData.missing_data[l]);
+            }
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets: [{ label: 'Data Distribution', data: values, backgroundColor: 'rgba(0,242,255,0.2)', borderColor: '#00f2ff', borderWidth: 1 }] },
+                options: { responsive: true, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } } } }
+            });
+        }
+
+        function toggleChart() {
+            const c   = document.getElementById('chart-container');
+            const btn = document.getElementById('chart-toggle-btn');
+            if (c.style.display === 'none') { c.style.display = 'block'; btn.textContent = 'HIDE CHART'; }
+            else                            { c.style.display = 'none';  btn.textContent = 'SHOW CHART'; }
+        }
+
+        // ── HUD polling (used only in Chat mode status tab) ──────────────
+        async function updateHUD() {
+            try {
+                const res  = await fetch('/brain/status');
+                const data = await res.json();
+                const u = data.uptime || 0;
+                const hh = Math.floor(u/3600).toString().padStart(2,'0');
+                const mm = Math.floor((u%3600)/60).toString().padStart(2,'0');
+                const ss = (u%60).toString().padStart(2,'0');
+                // Status tab elements (only visible when chat mode is active)
+                const ud = document.getElementById('uptime-display');
+                const ad = document.getElementById('activity-display');
+                const sd = document.getElementById('synapse-display');
+                const kd = document.getElementById('knowledge-display');
+                const ed = document.getElementById('entity-display');
+                if (ud) ud.textContent = `${hh}:${mm}:${ss}`;
+                if (ad) ad.textContent = `${data.neural_activity ?? 'N/A'}%`;
+                if (sd) sd.textContent = data.synapse_load ?? 'N/A';
+                if (kd) kd.textContent = `${data.knowledge_size_kb ?? 0} KB`;
+                if (ed && data.entity_types) {
+                    ed.innerHTML = Object.entries(data.entity_types)
+                        .map(([k,v]) => `<span style="color:var(--accent-color)">${k}</span>: ${v}`)
+                        .join('<br>') || 'ยังไม่มีข้อมูล';
+                }
+            } catch (e) {}
+        }
+        setInterval(updateHUD, 5000);
+
+        // ── Helpers ──────────────────────────────────────────────────────
+        function addMsg(role, text) {
+            const log = document.getElementById('chat-log');
+            const div = document.createElement('div');
+            div.className = `msg ${role}-msg`;
+            div.textContent = text;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // ── Live log polling (system process stream) ─────────────────────
+        // Polls /logs every 350ms and renders each message as a system bubble.
+        // Deduplication: tracks last 30 messages to avoid re-rendering on slow polls.
+        const _seenLogs = new Set();
+        const _LOG_COLORS = {
+            '[System]': '#00f2ff',
+            '[Brain]':  '#a78bfa',
+            '[DB]':     '#34d399',
+            '[Excel]':  '#fbbf24',
+            '[Intent]': '#f472b6',
+            '[Memory]': '#60a5fa',
+            '[Done]':   '#10b981',
+        };
+
+        function addSystemLog(text) {
+            // Deduplicate within a rolling window
+            if (_seenLogs.has(text)) return;
+            _seenLogs.add(text);
+            if (_seenLogs.size > 60) {
+                const first = _seenLogs.values().next().value;
+                _seenLogs.delete(first);
+            }
+
+            const log = document.getElementById('chat-log');
+            const div = document.createElement('div');
+            div.className = 'msg system-msg';
+
+            // Colour the tag prefix
+            let coloured = text;
+            for (const [tag, colour] of Object.entries(_LOG_COLORS)) {
+                if (text.includes(tag)) {
+                    coloured = text.replace(
+                        tag,
+                        `<span style="color:${colour};font-weight:600;">${tag}</span>`
+                    );
+                    break;
+                }
+            }
+            div.innerHTML = coloured;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        setInterval(async () => {
+            try {
+                const res = await fetch('/logs');
+                if (!res.ok) return;
+                const logs = await res.json();
+                logs.forEach(msg => addSystemLog(msg));
+            } catch(e) {}
+        }, 350);
+
+        function escapeHtml(text) {
+            if (text == null) return '';
+            return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+        }
+
+        // ── Selected rows store ───────────────────────────────────────────
+        let selectedRows = new Set();
+
+        function updatePreview(data) {
+            const section = document.getElementById('preview-section');
+            const body    = document.getElementById('preview-body');
+            if (!data || data.length === 0) return;
+            section.classList.add('expanded');
+            const headers = Object.keys(data[0]);
+            let html = '<table><thead><tr><th></th>' + headers.map(h => `<th>${escapeHtml(h)}</th>`).join('') + '</tr></thead><tbody>';
+            data.forEach((row, idx) => {
+                const rowId = row['ลำดับ'] || `preview-${idx}-${Date.now()}`;
+                const isSelected = selectedRows.has(rowId);
+                html += `<tr class="preview-row ${isSelected ? 'selected-row' : ''}" data-row-id="${escapeHtml(rowId)}">
+                    <td style="position:relative;width:30px;cursor:pointer;" onclick="togglePreviewRow(this, '${escapeHtml(rowId)}')">
+                        <span class="select-check ${isSelected ? 'visible' : ''}">✓</span>
+                    </td>
+                    ${headers.map(h => `<td>${escapeHtml(row[h] || '')}</td>`).join('')}
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            body.innerHTML = html;
+        }
+        
+        function togglePreviewRow(el, rowId) {
+            const tr = el.closest('tr');
+            const checkmark = el.querySelector('.select-check');
+            if (selectedRows.has(rowId)) {
+                selectedRows.delete(rowId);
+                checkmark.classList.remove('visible');
+                tr.classList.remove('selected-row');
+            } else {
+                selectedRows.add(rowId);
+                checkmark.classList.add('visible');
+                tr.classList.add('selected-row');
+            }
+        }
+
+        // ── Autocomplete ─────────────────────────────────────────────────
+        let acItems = [], acIndex = -1, acDebounce = null;
+
+        async function fetchSuggestions(val) {
+            clearTimeout(acDebounce);
+            const box = document.getElementById('autocomplete-box');
+            if (!val || val.length < 2) { box.classList.remove('visible'); acItems = []; return; }
+            acDebounce = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/brain/suggestions?q=${encodeURIComponent(val)}`);
+                    acItems   = await res.json();
+                    renderSuggestions(acItems);
+                } catch (e) { box.classList.remove('visible'); }
+            }, 200);
+        }
+
+        function renderSuggestions(items) {
+            const box = document.getElementById('autocomplete-box');
+            if (!items || items.length === 0) { box.classList.remove('visible'); return; }
+            box.innerHTML = items.map((s, i) =>
+                `<div class="autocomplete-item" data-idx="${i}" onclick="selectSuggestion('${s.replace(/'/g,"\\'")}')">${escapeHtml(s)}</div>`
+            ).join('');
+            box.classList.add('visible');
+            acIndex = -1;
+        }
+
+        function selectSuggestion(text) {
+            document.getElementById('cmd-input').value = text;
+            document.getElementById('autocomplete-box').classList.remove('visible');
+            document.getElementById('cmd-input').focus();
+        }
+
+        function handleSuggestionKey(e) {
+            const box   = document.getElementById('autocomplete-box');
+            const items = box.querySelectorAll('.autocomplete-item');
+            if (!box.classList.contains('visible') || items.length === 0) return;
+            if      (e.key === 'ArrowDown')                { e.preventDefault(); acIndex = Math.min(acIndex+1, items.length-1); }
+            else if (e.key === 'ArrowUp')                  { e.preventDefault(); acIndex = Math.max(acIndex-1, -1); }
+            else if (e.key === 'Escape')                   { box.classList.remove('visible'); acIndex = -1; return; }
+            else if (e.key === 'Tab' && acIndex >= 0)      { e.preventDefault(); selectSuggestion(acItems[acIndex]); return; }
+            else return;
+            items.forEach((el, i) => el.classList.toggle('selected', i === acIndex));
+            if (acIndex >= 0) document.getElementById('cmd-input').value = acItems[acIndex];
+        }
+
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.input-box'))
+                document.getElementById('autocomplete-box').classList.remove('visible');
+        });
+
+        // ── File upload button ────────────────────────────────────────────
+        document.getElementById('file-upload').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const formData = new FormData();
+            formData.append('file', file);
+            addMsg('user', 'Uploading: ' + file.name);
+            try {
+                const res  = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                addMsg('bot', data.message || 'Upload complete');
+            } catch (e) { addMsg('bot', 'Upload failed: ' + e.message); }
+        });
+
+        // ── Responsive layout ─────────────────────────────────────────────
+        function handleResponsiveLayout() {
+            const container = document.getElementById('main-container');
+            if (!container) return;
+            if (window.innerWidth <= 768) container.classList.add('column-layout');
+            else                          container.classList.remove('column-layout');
+        }
+        window.addEventListener('resize', handleResponsiveLayout);
+        handleResponsiveLayout();
+
+        // ── Tab switching ─────────────────────────────────────────────────
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tab = this.getAttribute('data-tab');
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                document.getElementById(tab + '-tab').classList.add('active');
+                if (tab === 'data' && typeof $ !== 'undefined' && $.fn.DataTable) {
+                    if (!$.fn.DataTable.isDataTable('#students-table')) initializeDataTable();
+                }
+                if (tab === 'status') updateHUD();
+            });
+        });
+
+        // ── DataTable ─────────────────────────────────────────────────────
+        function initializeDataTable() {
+            $('#students-table').DataTable({
+                serverSide: true,
+                ajax: {
+                    url: '/api/students', type: 'GET',
+                    data: function(d) {
+                        return {
+                            draw: d.draw,
+                            page: Math.floor(d.start / d.length) + 1,
+                            per_page: d.length,
+                            search: d.search.value || document.getElementById('search-input').value,
+                            filters: JSON.stringify({ ยศ: document.getElementById('rank-filter').value })
+                        };
+                    },
+                    dataSrc: 'data'
+                },
+                columns: [
+                    { data: null, orderable: false, searchable: false,
+                      render: function(data, type, row) {
+                          const rowId = (row['ลำดับ'] || row.id || Math.random().toString(36)).toString();
+                          const isSelected = selectedRows.has(rowId);
+                          return `<div style="position:relative;width:100%;height:100%;"><span class="select-check ${isSelected ? 'visible' : ''}">✓</span></div>`;
+                      }
+                    },
+                    { data: 'ลำดับ' }, { data: 'ยศ' }, { data: 'ชื่อ' }, { data: 'สกุล' },
+                    { data: 'ชั้นปีที่' }, { data: 'ตำแหน่ง' }, { data: 'สังกัด' }, { data: 'เบอร์โทรศัพท์' }
+                ],
+                pageLength: 25, responsive: true,
+                language: { url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json' }
+            });
+        }
+
+        // ── Row selection handler ────────────────────────────────────────────
+        $(document).on('click', '#students-table tbody td:first-child', function(e) {
+            const row = $(this).closest('tr');
+            const rowId = row.find('td:eq(1)').text().trim();
+            const checkmark = $(this).find('.select-check');
+
+            if (selectedRows.has(rowId)) {
+                selectedRows.delete(rowId);
+                checkmark.removeClass('visible');
+                row.removeClass('selected-row');
+            } else {
+                selectedRows.add(rowId);
+                checkmark.addClass('visible');
+                row.addClass('selected-row');
+            }
+        });
+
+        document.getElementById('apply-filters').addEventListener('click', function() {
+            if (typeof $ !== 'undefined' && $.fn.DataTable.isDataTable('#students-table'))
+                $('#students-table').DataTable().ajax.reload();
+        });
+        document.getElementById('search-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && typeof $ !== 'undefined' && $.fn.DataTable.isDataTable('#students-table'))
+                $('#students-table').DataTable().ajax.reload();
+        });
+    </script>
+
+    <!-- jQuery + DataTables (loaded last so DOM is ready) -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.tailwindcss.min.js"></script>
+</body>
+</html>

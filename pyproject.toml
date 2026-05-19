@@ -1,0 +1,20 @@
+[project]
+name = "excel_agent"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "flask",
+    "requests",
+    "pandas",
+    "openpyxl",
+    "gspread",
+    "google-auth",
+    "google-generativeai",
+    "python-dotenv",
+    "psutil",
+]
+
+[tool.basedpyright]
+typeCheckingMode = "basic"
+reportMissingImports = false
+reportMissingTypeStubs = false

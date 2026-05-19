@@ -1,0 +1,531 @@
+/* Neural Network HUD Styles */
+:root {
+  --primary: #00f2ff;
+  --secondary: #8a2be2;
+  --bg-deep: #02040a;
+  --bg-dark: #0a1628;
+  --text: #e2e8f0;
+  --text-dim: rgba(255, 255, 255, 0.3);
+  --accent: #00ff6a;
+}
+
+body { margin: 0; overflow: hidden; background: var(--bg-deep); font-family: 'Inter', sans-serif; }
+
+#loading-screen {
+  position: fixed; inset: 0; background: var(--bg-deep); z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.8s ease;
+}
+.loader-content {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+#loading-screen.hidden { opacity: 0; pointer-events: none; }
+/* Robotic AI Loader */
+.robot-loader {
+    width: 80px; height: 120px; position: relative;
+    margin-bottom: 30px; animation: float 2s ease-in-out infinite;
+}
+.robot-head {
+    width: 50px; height: 40px; background: var(--bg-dark);
+    border: 2px solid var(--primary); border-radius: 10px;
+    margin: 0 auto; position: relative; overflow: hidden;
+}
+.robot-eye {
+    width: 30px; height: 4px; background: var(--primary);
+    margin: 18px auto; border-radius: 2px;
+    box-shadow: 0 0 10px var(--primary);
+    animation: blink 3s infinite;
+}
+.robot-body {
+    width: 60px; height: 50px; background: var(--bg-dark);
+    border: 2px solid var(--primary); border-radius: 12px;
+    margin: 5px auto; position: relative;
+}
+.robot-core {
+    width: 20px; height: 20px; background: var(--secondary);
+    border-radius: 50%; margin: 15px auto;
+    box-shadow: 0 0 15px var(--secondary);
+    animation: pulse-core 1.5s infinite;
+}
+.robot-hands .hand {
+    position: absolute; width: 10px; height: 25px;
+    background: var(--primary); border-radius: 5px;
+    top: 50px;
+}
+.hand.left { left: -15px; animation: wave-l 2s ease-in-out infinite; }
+.hand.right { right: -15px; animation: wave-r 2s ease-in-out infinite; }
+
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+@keyframes blink { 0%, 10%, 90%, 100% { height: 4px; } 5% { height: 0; } }
+@keyframes pulse-core { 0%, 100% { opacity: 0.5; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.1); } }
+@keyframes wave-l { 0%, 100% { transform: rotate(15deg); } 50% { transform: rotate(-15deg); } }
+@keyframes wave-r { 0%, 100% { transform: rotate(-15deg); } 50% { transform: rotate(15deg); } }
+#progress-bar { width: 0%; transition: width 0.3s ease; box-shadow: 0 0 15px var(--primary); }
+#progress-text { font-family: 'Orbitron', monospace; color: var(--primary); font-size: 10px; }
+
+#canvas-container { position: absolute; inset: 0; z-index: 1; }
+
+.hud-panel {
+  position: absolute; background: rgba(10, 15, 26, 0.7);
+  border: 1px solid rgba(0, 242, 255, 0.2); backdrop-filter: blur(12px);
+  border-radius: 4px; z-index: 10; min-width: 220px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+.top-left { top: 25px; left: 25px; }
+.top-right { top: 25px; right: 25px; }
+.bottom-left { bottom: 100px; left: 25px; }
+.bottom-right { bottom: 100px; right: 25px; }
+
+.neural-top-bar {
+  position: absolute; top: 15px; left: 15px; right: 15px;
+  height: 50px; display: flex; gap: 50px; align-items: center;
+  padding: 0 30px; background: rgba(5, 10, 20, 0.9);
+  border: 1px solid var(--primary); border-radius: 10px;
+  backdrop-filter: blur(20px); z-index: 500;
+  box-shadow: 0 0 25px rgba(0, 242, 255, 0.15), inset 0 0 10px rgba(0, 242, 255, 0.1);
+}
+.neural-stat { display: flex; gap: 15px; align-items: center; font-family: 'Orbitron', monospace; min-width: 160px; }
+.neural-stat .stat-label { color: var(--text-dim); font-size: 10px; letter-spacing: 1.5px; white-space: nowrap; }
+.neural-stat .stat-value { color: var(--primary); font-size: 14px; text-shadow: 0 0 12px var(--primary); font-weight: 700; }
+
+.panel-header {
+  padding: 10px 15px; border-bottom: 1px solid rgba(0,242,255,0.2);
+  font-size: 11px; font-family: 'Orbitron', monospace; letter-spacing: 1px;
+  color: var(--primary); display: flex; justify-content: space-between;
+}
+.panel-content { padding: 12px 15px; font-size: 12px; line-height: 1.5; color: var(--text); }
+
+/* Data Stream Scroll Area */
+.data-stream {
+  max-height: 25vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) transparent;
+}
+.data-stream::-webkit-scrollbar {
+  width: 4px;
+}
+.data-stream::-webkit-scrollbar-track {
+  background: rgba(0, 242, 255, 0.05);
+  border-radius: 2px;
+}
+.data-stream::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 2px;
+}
+
+/* Side Decorators */
+.hud-side-bar {
+    position: absolute; top: 150px; bottom: 150px;
+    width: 2px; background: linear-gradient(transparent, var(--primary), transparent);
+    opacity: 0.3;
+}
+.side-l { left: 10px; }
+.side-r { right: 10px; }
+
+.neural-input-container {
+  position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+  z-index: 200; width: 500px;
+}
+.neural-input {
+  display: flex; gap: 8px;
+  background: rgba(10, 15, 26, 0.95) !important; 
+  border: 1px solid var(--primary) !important;
+  border-radius: 8px; padding: 6px; backdrop-filter: blur(15px);
+  box-shadow: 0 0 20px rgba(0,0,0,0.8), 0 0 10px rgba(0,242,255,0.2);
+}
+.neural-input input {
+  flex: 1; background: transparent !important; border: none !important; padding: 10px 15px;
+  color: var(--primary) !important; font-size: 14px; outline: none;
+  font-family: 'Inter', sans-serif;
+}
+.neural-input input::placeholder { color: rgba(0, 242, 255, 0.4) !important; }
+.neural-input button {
+  background: rgba(0,242,255,0.1); border: 1px solid var(--primary);
+  color: var(--primary); padding: 0 16px; border-radius: 6px;
+  font-family: 'Orbitron'; font-size: 11px; cursor: pointer;
+  transition: all 0.2s;
+}
+.neural-input button:hover { background: rgba(0,242,255,0.2); }
+
+.processing-overlay, .response-display {
+  position: fixed; inset: 0; background: rgba(2,4,10,0.9);
+  display: none; align-items: center; justify-content: center; z-index: 1000;
+}
+.processing-overlay.active, .response-display.active { display: flex; }
+.response-content {
+  max-width: 600px; padding: 30px; background: rgba(10,15,26,0.95);
+  border: 1px solid var(--primary); border-radius: 12px; color: var(--text);
+  box-shadow: 0 0 50px rgba(0,242,255,0.2);
+}
+
+.scanline {
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events: none; z-index: 9998;
+}
+.vignette {
+  position: fixed; inset: 0;
+  background: radial-gradient(circle at center, transparent 60%, rgba(2,4,10,0.4) 100%);
+  pointer-events: none; z-index: 9997;
+}
+
+.skeleton {
+  height: 8px; background: linear-gradient(90deg, rgba(0,242,255,0.05) 25%, rgba(0,242,255,0.15) 50%, rgba(0,242,255,0.05) 75%);
+  background-size: 200% 100%; animation: shimmer 1.5s infinite;
+  margin-bottom: 8px; border-radius: 2px;
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* Neural Brain Loader Upgrade */
+.brain-loader {
+    width: 140px;
+    height: 140px;
+    margin-bottom: 25px;
+    position: relative;
+}
+.brain-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+.brain-line {
+    fill: none;
+    stroke: var(--primary);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    animation: traceLine 2s ease-in-out infinite alternate;
+}
+.brain-line.inner {
+    stroke: var(--secondary);
+    stroke-width: 1.5;
+    animation-delay: 0.5s;
+}
+.brain-link {
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    animation: traceLine 1.5s ease-in-out infinite alternate;
+    animation-delay: 1s;
+}
+.brain-dot {
+    fill: var(--primary);
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: flashDot 2s infinite alternate;
+}
+.brain-dot.core { 
+    fill: var(--secondary); 
+    animation-duration: 1.5s; 
+    animation-delay: 0.3s;
+}
+.brain-dot.center { 
+    fill: var(--accent); 
+    animation: pulseCore 1s infinite alternate; 
+}
+
+@keyframes traceLine {
+    0% { stroke-dashoffset: 200; opacity: 0.1; }
+    100% { stroke-dashoffset: 0; opacity: 1; filter: drop-shadow(0 0 5px currentColor); }
+}
+@keyframes flashDot {
+    0% { opacity: 0.2; transform: scale(0.8); }
+    100% { opacity: 1; transform: scale(1.5); filter: drop-shadow(0 0 8px currentColor); }
+}
+@keyframes pulseCore {
+    0% { opacity: 0.5; transform: scale(1); }
+    100% { opacity: 1; transform: scale(1.8); filter: drop-shadow(0 0 15px var(--accent)); }
+}
+
+.processing-text {
+    margin-top: 15px;
+    font-family: 'Orbitron', monospace;
+    color: var(--primary);
+    letter-spacing: 5px;
+    text-shadow: 0 0 10px var(--primary);
+    font-size: 14px;
+    animation: pulse-text 1.5s infinite alternate;
+}
+@keyframes pulse-text {
+    0% { opacity: 1; filter: drop-shadow(0 0 10px var(--primary)); }
+    100% { opacity: 0.5; filter: none; }
+}
+
+/* Mode Toggle Styling */
+.mode-toggle {
+    display: flex; align-items: center; gap: 12px;
+    font-family: 'Orbitron', sans-serif; font-size: 10px; color: var(--text-dim);
+}
+.switch { position: relative; display: inline-block; width: 36px; height: 18px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+    position: absolute; cursor: pointer; inset: 0; background-color: rgba(255,255,255,0.1);
+    transition: .4s; border-radius: 34px; border: 1px solid rgba(0,242,255,0.3);
+}
+.slider:before {
+    position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 2px;
+    background-color: var(--primary); transition: .4s; border-radius: 50%;
+}
+input:checked + .slider { background-color: rgba(0,242,255,0.2); }
+input:checked + .slider:before { transform: translateX(18px); }
+
+/* HOLOGRAPHIC TARGET PROFILE */
+.hologram-modal {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2000; pointer-events: none; opacity: 0;
+    transition: opacity 0.5s ease;
+}
+.hologram-modal.active {
+    opacity: 1; pointer-events: all;
+}
+.hologram-backdrop {
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at center, rgba(0, 242, 255, 0.05), rgba(2, 4, 10, 0.8));
+    backdrop-filter: blur(5px);
+}
+.hologram-card {
+    position: relative; width: 450px; max-height: 80vh;
+    background: rgba(10, 15, 26, 0.85);
+    border: 1px solid var(--primary);
+    border-radius: 4px; box-shadow: 0 0 40px rgba(0, 242, 255, 0.2), inset 0 0 20px rgba(0, 242, 255, 0.1);
+    transform: scale(0.9) translateY(20px);
+    transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    overflow: hidden;
+    padding: 20px;
+}
+.hologram-modal.active .hologram-card {
+    transform: scale(1) translateY(0);
+}
+.card-glitch-layer {
+    position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,242,255,0.05) 2px, rgba(0,242,255,0.05) 4px);
+    opacity: 0.5;
+}
+.card-header {
+    display: flex; gap: 15px; border-bottom: 1px solid rgba(0, 242, 255, 0.3);
+    padding-bottom: 15px; margin-bottom: 15px;
+}
+.target-lock-icon { width: 50px; height: 50px; }
+.target-dot { animation: flashDot 1.5s infinite alternate; }
+.header-text { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.header-text .title { color: var(--accent); font-family: 'Orbitron', monospace; font-size: 18px; letter-spacing: 2px; text-shadow: 0 0 10px var(--accent); }
+.header-text .subtitle { color: var(--text-dim); font-size: 11px; margin-top: 4px; }
+.close-btn { 
+    background: transparent; border: none; color: var(--text-dim); font-size: 16px; cursor: pointer;
+    transition: color 0.2s; align-self: flex-start; z-index: 10;
+}
+.close-btn:hover { color: #ff4d4d; text-shadow: 0 0 10px #ff4d4d; }
+
+.card-body {
+    display: flex; flex-direction: column; gap: 12px;
+    font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text);
+    overflow-y: auto; max-height: 50vh; padding-right: 10px; position: relative; z-index: 5;
+}
+.card-body::-webkit-scrollbar { width: 4px; }
+.card-body::-webkit-scrollbar-thumb { background: var(--primary); }
+.data-row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 8px; background: rgba(0, 242, 255, 0.05); border-left: 2px solid var(--primary);
+    transition: background 0.3s;
+}
+.data-row:hover { background: rgba(0, 242, 255, 0.1); }
+.data-label { color: var(--primary); font-size: 10px; font-family: 'Orbitron', monospace; min-width: 100px; }
+.data-value { color: var(--text); font-weight: 500; text-align: right; }
+
+.card-footer {
+    margin-top: 20px; display: flex; align-items: center; gap: 15px; position: relative; z-index: 5;
+}
+.status-bar {
+    flex: 1; height: 4px; background: rgba(0, 242, 255, 0.1); border-radius: 2px; overflow: hidden;
+}
+.status-fill {
+    width: 0%; height: 100%; background: var(--accent);
+    animation: fillBar 1.5s forwards ease-out;
+}
+@keyframes fillBar { to { width: 100%; } }
+
+/* Holographic Glitch Animation for the whole card */
+@keyframes hologramGlitch {
+    0% { transform: translate(0) skew(0); }
+    20% { transform: translate(-2px, 1px) skew(-1deg); filter: hue-rotate(10deg); }
+    40% { transform: translate(1px, -1px) skew(1deg); filter: hue-rotate(-10deg); }
+    60% { transform: translate(0) skew(0); filter: hue-rotate(0); }
+    100% { transform: translate(0) skew(0); }
+}
+.hologram-card.glitching { animation: hologramGlitch 0.3s ease; }
+
+/* RESPONSIVENESS FOR SCALING / ZOOMING */
+@media (max-width: 1400px) {
+    .hud-left { transform: scale(0.9); transform-origin: top left; }
+    .hud-right { transform: scale(0.9); transform-origin: top right; }
+    .neural-input-container { width: 70%; bottom: 30px; }
+}
+
+@media (max-width: 1100px) {
+    .hud-left { transform: scale(0.8); transform-origin: top left; }
+    .hud-right { transform: scale(0.8); transform-origin: top right; }
+    .neural-input-container { width: 85%; bottom: 20px; }
+    .hologram-card { width: 90%; max-width: 450px; }
+}
+
+@media (max-width: 800px) {
+    .hud-left { transform: scale(0.65); transform-origin: top left; }
+    .hud-right { transform: scale(0.65); transform-origin: top right; }
+    .neural-input-container { width: 95%; bottom: 15px; }
+    .neural-input input { font-size: 14px; padding: 12px; }
+    .neural-btn { padding: 0 15px; font-size: 12px; }
+}
+
+/* Hologram Navigation */
+.hologram-nav {
+    display: flex;
+    margin-top: 15px;
+    border: 1px solid rgba(0, 242, 255, 0.3);
+    background: rgba(0, 242, 255, 0.05);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.holo-nav-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--primary);
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 2px;
+}
+.holo-nav-btn:hover {
+    background: rgba(0, 242, 255, 0.2);
+    color: var(--accent);
+}
+.holo-nav-btn:active {
+    background: rgba(0, 242, 255, 0.4);
+}
+.holo-nav-divider {
+    width: 1px;
+    background: rgba(0, 242, 255, 0.3);
+}
+
+/* Enhanced Responsive Design */
+@media (max-width: 1200px) {
+    .hud-panel { min-width: 180px; }
+    .neural-stat { min-width: 120px; }
+    .neural-stat .stat-value { font-size: 12px; }
+    .neural-top-bar { padding: 0 15px; }
+    .neural-input-container { width: 600px; }
+}
+
+@media (max-width: 900px) {
+    .hud-panel { 
+        min-width: 150px; 
+        font-size: 10px;
+    }
+    .panel-header { font-size: 9px; padding: 8px 10px; }
+    .panel-content { padding: 8px 10px; font-size: 10px; }
+    .neural-input-container { width: 90%; }
+    .hologram-card { width: 95%; max-width: 400px; }
+    .data-row { padding: 6px; font-size: 11px; }
+    .header-text .title { font-size: 14px; }
+}
+
+@media (max-width: 768px) {
+    body.neural-body { overflow: auto; }
+    .hud-side-bar { display: none; }
+    .neural-top-bar { 
+        position: relative;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 10px;
+        height: auto;
+    }
+    .neural-stat { min-width: 100px; }
+    .neural-stat .stat-label { font-size: 8px; }
+    .neural-stat .stat-value { font-size: 11px; }
+    .mode-toggle { 
+        position: relative;
+        top: auto;
+        right: auto;
+        transform: none;
+        margin-left: auto;
+    }
+    .hud-panel {
+        position: relative;
+        width: 100%;
+        min-width: auto;
+        margin-bottom: 10px;
+        top: auto !important;
+        left: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+    }
+    .data-stream { max-height: 150px; }
+    .neural-input-container { 
+        position: fixed;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 95%;
+        max-width: 500px;
+    }
+    .neural-input input { font-size: 13px; padding: 8px; }
+}
+
+@media (max-width: 480px) {
+    .neural-stat { min-width: 80px; }
+    .neural-stat .stat-label { font-size: 7px; }
+    .neural-stat .stat-value { font-size: 10px; }
+    .neural-input-container { width: 100%; left: 0; transform: none; }
+    .neural-input { padding: 4px; }
+    .neural-input input { padding: 6px; font-size: 12px; }
+    .hologram-card { padding: 15px; }
+    .header-text .title { font-size: 12px; }
+    .data-label { min-width: 70px; font-size: 9px; }
+    .data-value { font-size: 11px; }
+}
+
+/* ── Hologram Select Checkmark Button ─────────────────────────────── */
+.holo-select-btn {
+    position: absolute;
+    bottom: 14px;
+    right: 14px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 242, 255, 0.4);
+    background: rgba(10, 15, 26, 0.85);
+    color: rgba(0, 242, 255, 0.4);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s ease;
+    z-index: 20;
+    box-shadow: 0 0 8px rgba(0, 242, 255, 0.1);
+}
+.holo-select-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(0, 242, 255, 0.12);
+    box-shadow: 0 0 14px rgba(0, 242, 255, 0.35);
+    transform: scale(1.1);
+}
+.holo-select-btn.holo-check-active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0, 255, 106, 0.15);
+    box-shadow: 0 0 16px rgba(0, 255, 106, 0.45);
+}
+.holo-select-btn.holo-check-active:hover {
+    background: rgba(0, 255, 106, 0.25);
+    transform: scale(1.1);
+}
