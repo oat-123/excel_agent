@@ -83,6 +83,8 @@ def append_row_live(filename, data):
     """
     Append row into opened Excel workbook with realtime visual update
     and preserve previous row formatting.
+    Only include columns A-J (จนถึง เบอร์โทรศัพท์).
+    Column A (ลำดับ) auto-generates Thai numerals.
     """
     pythoncom.CoInitialize()
 
@@ -129,30 +131,79 @@ def append_row_live(filename, data):
         sheet.Rows(last_row).Copy()
         sheet.Rows(target_row).PasteSpecial(-4122)   # xlPasteFormats
 
-        values = list(data.values())
+        # กรองเฉพาะข้อมูล columns A-J (9 columns)
+        # ลำดับ, ยศ, ชื่อ, สกุล, ชั้นปีที่, ตอน, ตำแหน่ง, สังกัด, เบอร์โทรศัพท์
+        values = list(data.values())[:9]
 
-        # เขียนทีละ cell realtime
-        for col, value in enumerate(values, start=1):
-            cell = sheet.Cells(target_row, col)
+        # col_idx = 1 = ลำดับ (auto-generate Thai numerals)
+        # col_idx = 2-9 = other fields from data
+        
+        # Count existing rows to auto-generate sequence number
+        data_start_row = 4  # Assume data starts at row 4 (after header)
+        if target_row > data_start_row:
+            seq_number = target_row - data_start_row + 1
+        else:
+            seq_number = 1
+
+        # Convert to Thai numerals (๑๒๓๔๕๖๗๘๙๐)
+        thai_digits = str.maketrans('0123456789', '๐๑๒๓๔๕๖๗๘๙')
+        thai_seq = str(seq_number).translate(thai_digits)
+
+        from utils.logger import push_log
+        
+        # Write cell by cell (realtime)
+        col_idx = 1
+        # Cell A (ลำดับ) = auto-generated Thai numeral
+        push_log(f"[Excel] writing ลำดับ ({col_idx}) = {thai_seq}")
+        cell = sheet.Cells(target_row, col_idx)
+        cell.Value = thai_seq
+        cell.Select()
+        time.sleep(0.12)
+
+        # Remaining columns (B-J)
+        _COL_NAMES = {
+            2: "ยศ",
+            3: "ชื่อ",
+            4: "สกุล",
+            5: "ชั้นปีที่",
+            6: "ตอน",
+            7: "ตำแหน่ง",
+            8: "สังกัด",
+            9: "เบอร์โทรศัพท์",
+        }
+
+        for i, value in enumerate(values[1:] if len(values) > 1 else [], start=2):
+            col_label = _COL_NAMES.get(i, f"col{i}")
+            display_val = str(value) if value is not None else ""
+            push_log(f"[Excel] writing {col_label} ({i}) = {display_val}")
+            cell = sheet.Cells(target_row, i)
             cell.Value = value
             cell.Select()
-            time.sleep(0.25)
+            time.sleep(0.12)
 
+        # Save workbook
+        push_log("[Excel] save workbook")
         workbook.Save()
 
         # bring excel มาหน้า
         excel.Visible = True
         excel.WindowState = -4137
-        excel.ActiveWindow.Activate()
-
+        try:
+            excel.ActiveWindow.Activate()
+        except Exception:
+            pass
         sheet.Cells(target_row, 1).Select()
+
+        push_log(f"[Done] เพิ่มข้อมูลแถว {target_row} ใน {filename} สำเร็จ ✓")
 
         return {
             "status": "success",
-            "message": f"เพิ่มข้อมูลใน {filename} แบบ realtime สำเร็จ"
+            "message": f"เพิ่มข้อมูลใน {filename} แบบ realtime สำเร็จ (แถว {target_row})",
         }
 
     except Exception as e:
+        from utils.logger import push_log
+        push_log(f"[Excel] ERROR: {e}", "error")
         return {
             "status": "error",
             "message": str(e)
@@ -186,17 +237,17 @@ def ensure_file_path(command_file=None):
     full_path = os.path.join(DATA_FOLDER, requested_file)
     
     if os.path.exists(full_path):
-        return {"filename": requested_file, "exists": True, "suggestion": None}
+        return {"filename": requested_file, "exists": True, "suggestion": None, "path": full_path}
     
     # Try to find similar filename
     suggestion = find_similar_filename(requested_file)
     if suggestion and suggestion != requested_file:
-        return {"filename": requested_file, "exists": False, "suggestion": suggestion}
+        return {"filename": requested_file, "exists": False, "suggestion": suggestion, "path": full_path}
     
-    return {"filename": requested_file, "exists": False, "suggestion": None}
+    return {"filename": requested_file, "exists": False, "suggestion": None, "path": full_path}
 
 
-STUDENT_BASE_COLS = ["ลำดับ", "ยศ", "ชื่อ", "สกุล", "ชั้นปีที่", "ตอน", "ตำแหน่ง", "สังกัด", "เบอร์โทรศัพท์", "หมายเหตุ"]
+STUDENT_BASE_COLS = ["ลำดับ", "ยศ", "ชื่อ", "สกุล", "ชั้นปีที่", "ตอน", "ตำแหน่ง", "สังกัด", "เบอร์โทรศัพท์"]
 # Export to Excel: columns A–I (ลำดับ … เบอร์โทรศัพท์)
 STUDENT_SHEET_EXPORT_COLS = STUDENT_BASE_COLS
 
@@ -513,6 +564,8 @@ def search_excel(command):
     hi, df = read_dataframe_with_header(filename, command.get("sheet", "Sheet1"))
     if _use_student_layout_on_save(hi, file_info["filename"]):
         df = slim_to_export_columns(df)
+    # Filter to only A-J columns
+    df = df.iloc[:, :9]
     result = df[df.astype(str).apply(lambda row: row.str.contains(keyword, case=False).any(), axis=1)]
     return {"status": "success", "rows": result.fillna("").to_dict(orient="records")}
 
@@ -525,6 +578,7 @@ def copy_data(command):
     use_layout = _use_student_layout_on_save(hi, file_info["filename"])
     if use_layout:
         df = slim_to_export_columns(df)
+    df = df.iloc[:, :9]  # Limit to A-J
     dest_path = os.path.join(DATA_FOLDER, dest_file)
     dest_title = os.path.splitext(dest_file)[0]
     if use_layout:
@@ -548,6 +602,8 @@ def merge_files(command):
     if use_layout:
         df1 = slim_to_export_columns(df1)
         df2 = slim_to_export_columns(df2)
+    df1 = df1.iloc[:, :9]
+    df2 = df2.iloc[:, :9]
     merged = pd.concat([df1, df2], ignore_index=True)
     title_text = os.path.splitext(file_info["filename"])[0]
     if use_layout:
@@ -564,6 +620,7 @@ def convert_format(command):
     hi, df = read_dataframe_with_header(filename, command.get("sheet", "Sheet1"))
     if _use_student_layout_on_save(hi, file_info["filename"]):
         df = slim_to_export_columns(df)
+    df = df.iloc[:, :9]  # Limit to A-J
     base_name = file_info["filename"].replace(".xlsx", "")
     output_file = f"{base_name}.{output_format}"
     output_path = os.path.join(DATA_FOLDER, output_file)
@@ -580,6 +637,7 @@ def summarize_data(command):
     hi, df = read_dataframe_with_header(filename, command.get("sheet", "Sheet1"))
     if _use_student_layout_on_save(hi, file_info["filename"]):
         df = slim_to_export_columns(df)
+    df = df.iloc[:, :9]  # Limit to A-J
     summary = {"total_rows": len(df), "columns": list(df.columns), "text_summary": {}}
     for col in df.select_dtypes(include=['object']).columns[:5]:
         summary["text_summary"][col] = {"unique_values": int(df[col].nunique())}
@@ -592,6 +650,7 @@ def get_statistics(command):
     hi, df = read_dataframe_with_header(filename, command.get("sheet", "Sheet1"))
     if _use_student_layout_on_save(hi, file_info["filename"]):
         df = slim_to_export_columns(df)
+    df = df.iloc[:, :9]  # Limit to A-J
     stats = {"row_count": len(df), "missing_data": {}}
     for col in df.columns:
         missing = df[col].isna().sum()
@@ -641,7 +700,8 @@ def analyze_file_structure(filepath):
     analysis = {"file_path": filepath, "sheets": []}
     for name in excel_file.sheet_names:
         df = pd.read_excel(filepath, sheet_name=name)
-        analysis["sheets"].append({"name": name, "rows": len(df), "column_info": [{"name": str(c)} for c in df.columns]})
+        df = df.iloc[:, :9]  # Limit to A-J
+        analysis["sheets"].append({"name": name, "rows": len(df), "column_info": [{"name": str(c)} for c in df.columns[:9]]})
     return analysis
 
 def detect_patterns_and_relationships(analysis):
@@ -664,6 +724,7 @@ def export_to_csv(command):
     if not os.path.exists(filename): return {"error": "file not found"}
     hi, df = read_dataframe_with_header(filename, command.get("sheet", "Sheet1"))
     df = slim_to_export_columns(df)
+    df = df.iloc[:, :9]  # Limit to A-J
     base_name = file_info["filename"].replace(".xlsx", "")
     output_file = f"{base_name}.csv"
     output_path = os.path.join(DATA_FOLDER, output_file)
@@ -677,13 +738,14 @@ def export_to_html(command):
     if not os.path.exists(filename): return {"error": "file not found"}
     hi, df = read_dataframe_with_header(filename, command.get("sheet", "Sheet1"))
     df = slim_to_export_columns(df)
+    df = df.iloc[:, :9]  # Limit to A-J
     base_name = file_info["filename"].replace(".xlsx", "")
     output_file = f"{base_name}.html"
     output_path = os.path.join(DATA_FOLDER, output_file)
     html_content = df.to_html(index=False, escape=False, classes="excel-table")
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(f"<!DOCTYPE html><html><head><title>{base_name}</title>")
-        f.write("<style>.excel-table{border-collapse:collapse;width:100%;} .excel-table th,.excel-table td{border:1px solid #ddd;padding:8px;text-align:left;} .excel-table th{background-color:#4CAF50;color:white;}</style>")
+        f.write("<style>.excel-table{border-collapse:collapse;width:100%;} .excel-table th,.excel-table td{border:1px solid #ddd;padding:8px;text-align:left;} .excel-table th{background-color:#4C5859;color:white;}</style>")
         f.write("</head><body>" + html_content + "</body></html>")
     return {"status": "success", "message": f"Exported to {output_file}", "output_file": output_file}
 
@@ -694,6 +756,7 @@ def export_dashboard(command):
     if not os.path.exists(filename): return {"error": "file not found"}
     hi, df = read_dataframe_with_header(filename, command.get("sheet", "Sheet1"))
     df = slim_to_export_columns(df)
+    df = df.iloc[:, :9]  # Limit to A-J
     
     dashboard = {
         "total_records": len(df),
