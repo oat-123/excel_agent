@@ -241,6 +241,27 @@
         }
         .autocomplete-item:hover, .autocomplete-item.selected { background: rgba(0,242,255,0.1); color: var(--accent-color); }
 
+        .hist-btn {
+            background: rgba(0, 242, 255, 0.05);
+            border: 1px solid rgba(0, 242, 255, 0.2);
+            color: var(--accent-color);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            max-width: 150px;
+        }
+        .hist-btn:hover {
+            background: rgba(0, 242, 255, 0.15);
+            border-color: var(--accent-color);
+            box-shadow: 0 0 10px rgba(0, 242, 255, 0.3);
+            transform: translateY(-1px);
+        }
+
         /* Responsive */
         @media (max-width: 1024px) { .preview-section.expanded { width: 350px; } .chat-section { min-width: 300px; } }
         @media (max-width: 768px) {
@@ -299,6 +320,7 @@
                     <div class="typing-indicator" id="typing-indicator">
                         <div class="dot"></div><div class="dot"></div><div class="dot"></div>
                     </div>
+                    <div id="command-history" style="padding: 10px 20px; display: none; flex-wrap: wrap; gap: 8px; background: rgba(0,0,0,0.2); border-top: 1px solid var(--border); align-items: center;"></div>
                     <div class="input-box" style="position:relative;">
                         <div id="autocomplete-box" class="autocomplete-box"></div>
                         <input type="file" id="file-upload" accept=".xlsx,.xls,.csv,.json" style="display:none;">
@@ -373,6 +395,10 @@
             <div class="section-header">
                 <h2>Data Insight</h2>
                 <div style="flex:1;"></div>
+                <button onclick="appendSelectedRows()" id="append-btn"
+                    style="background:rgba(16, 185, 129, 0.2);border:1px solid var(--success);color:var(--success);font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;margin-right:8px;display:none;">
+                    <i class="fas fa-plus"></i> เพิ่มลงไฟล์
+                </button>
                 <button onclick="toggleChart()" id="chart-toggle-btn"
                     style="background:none;border:1px solid var(--border);color:var(--accent-color);font-size:10px;padding:2px 8px;border-radius:4px;cursor:pointer;">
                     SHOW CHART
@@ -448,6 +474,7 @@
                 overlay.classList.remove('active');
                 if (data.status === 'success') {
                     addMsg('bot', `เรียนรู้โครงสร้างจากไฟล์ ${file.name} เรียบร้อยแล้วครับ!`);
+                    window.currentFilename = data.filename || file.name;
                     if (data.preview) updatePreview(data.preview);
                 } else {
                     addMsg('bot', `เกิดข้อผิดพลาด: ${data.error}`);
@@ -491,8 +518,10 @@
 
                 if (data.status === 'success') {
                     addMsg('bot', data.message || 'ดำเนินการเรียบร้อยครับ');
+                    if (data.filename) window.currentFilename = data.filename;
                     if (data.preview || data.rows) updatePreview(data.preview || data.rows);
                     if (data.summary || data.statistics) renderChart(data.summary || data.statistics);
+                    pushCommandToHistory(cmd);
                 } else {
                     addMsg('bot', 'ขออภัยครับ เกิดข้อผิดพลาด: ' + (data.error || data.message || 'Unknown error'));
                 }
@@ -570,9 +599,38 @@
             log.scrollTop = log.scrollHeight;
         }
 
+        // ── Command History ──────────────────────────────────────────────
+        function pushCommandToHistory(cmd) {
+            if (!cmd) return;
+            let hist = JSON.parse(localStorage.getItem('ja_command_history') || '[]');
+            if (hist.length && hist[0] === cmd) return;
+            hist.unshift(cmd);
+            if (hist.length > 200) hist = hist.slice(0,200);
+            localStorage.setItem('ja_command_history', JSON.stringify(hist));
+            renderCommandHistory();
+        }
+
+        function renderCommandHistory() {
+            const div = document.getElementById('command-history');
+            if (!div) return;
+            const hist = JSON.parse(localStorage.getItem('ja_command_history') || '[]');
+            if (hist.length === 0) {
+                div.style.display = 'none';
+                return;
+            }
+            div.style.display = 'flex';
+            div.innerHTML = '<span style="color:var(--accent-color);font-size:0.75rem;margin-right:5px;font-family:\'Orbitron\',sans-serif;">HISTORY:</span>' + 
+                hist.slice(0,10).map(h => `<button class="hist-btn" onclick="restoreCommand('${h.replace(/'/g,"\\'")}')" title="${escapeHtml(h)}">${escapeHtml(h)}</button>`).join(' ');
+        }
+
+        function restoreCommand(cmd) {
+            document.getElementById('cmd-input').value = cmd;
+            document.getElementById('cmd-input').focus();
+        }
+
         // ── Live log polling (system process stream) ─────────────────────
         // Polls /logs every 350ms and renders each message as a system bubble.
-        // Deduplication: tracks last 30 messages to avoid re-rendering on slow polls.
+        // Deduplication: tracks last 200 messages to avoid re-rendering on slow polls.
         const _seenLogs = new Set();
         const _LOG_COLORS = {
             '[System]': '#00f2ff',
@@ -584,16 +642,26 @@
             '[Done]':   '#10b981',
         };
 
-        function addSystemLog(text) {
-            // Deduplicate within a rolling window
-            if (_seenLogs.has(text)) return;
-            _seenLogs.add(text);
-            if (_seenLogs.size > 60) {
-                const first = _seenLogs.values().next().value;
-                _seenLogs.delete(first);
+        function persistLiveLog(text) {
+            let logs = JSON.parse(localStorage.getItem('ja_live_logs') || '[]');
+            logs.push(text);
+            if (logs.length > 1000) {
+                logs = logs.slice(-1000);
             }
+            localStorage.setItem('ja_live_logs', JSON.stringify(logs));
+        }
 
+        function loadPersistedLiveLogs() {
+            const logs = JSON.parse(localStorage.getItem('ja_live_logs') || '[]');
+            logs.forEach(text => {
+                _seenLogs.add(text);
+                renderSystemLogBubble(text);
+            });
+        }
+
+        function renderSystemLogBubble(text) {
             const log = document.getElementById('chat-log');
+            if (!log) return;
             const div = document.createElement('div');
             div.className = 'msg system-msg';
 
@@ -613,6 +681,19 @@
             log.scrollTop = log.scrollHeight;
         }
 
+        function addSystemLog(text) {
+            if (_seenLogs.has(text)) return;
+            _seenLogs.add(text);
+            if (_seenLogs.size > 200) {
+                const arr = Array.from(_seenLogs);
+                _seenLogs.clear();
+                arr.slice(-200).forEach(a=>_seenLogs.add(a));
+            }
+
+            renderSystemLogBubble(text);
+            persistLiveLog(text);
+        }
+
         setInterval(async () => {
             try {
                 const res = await fetch('/logs');
@@ -629,17 +710,29 @@
 
         // ── Selected rows store ───────────────────────────────────────────
         let selectedRows = new Set();
+        let previewSelectedRows = new Set();
 
         function updatePreview(data) {
             const section = document.getElementById('preview-section');
             const body    = document.getElementById('preview-body');
             if (!data || data.length === 0) return;
             section.classList.add('expanded');
+
+            // Save preview data globally
+            window.currentPreviewData = data;
+
+            // Show append button
+            const appendBtn = document.getElementById('append-btn');
+            if (appendBtn) appendBtn.style.display = 'inline-block';
+
+            // Clear previous selections for a new preview
+            previewSelectedRows.clear();
+
             const headers = Object.keys(data[0]);
             let html = '<table><thead><tr><th></th>' + headers.map(h => `<th>${escapeHtml(h)}</th>`).join('') + '</tr></thead><tbody>';
             data.forEach((row, idx) => {
-                const rowId = row['ลำดับ'] || `preview-${idx}-${Date.now()}`;
-                const isSelected = selectedRows.has(rowId);
+                const rowId = idx.toString();
+                const isSelected = previewSelectedRows.has(rowId);
                 html += `<tr class="preview-row ${isSelected ? 'selected-row' : ''}" data-row-id="${escapeHtml(rowId)}">
                     <td style="position:relative;width:30px;cursor:pointer;" onclick="togglePreviewRow(this, '${escapeHtml(rowId)}')">
                         <span class="select-check ${isSelected ? 'visible' : ''}">✓</span>
@@ -654,14 +747,70 @@
         function togglePreviewRow(el, rowId) {
             const tr = el.closest('tr');
             const checkmark = el.querySelector('.select-check');
-            if (selectedRows.has(rowId)) {
-                selectedRows.delete(rowId);
+            if (previewSelectedRows.has(rowId)) {
+                previewSelectedRows.delete(rowId);
                 checkmark.classList.remove('visible');
                 tr.classList.remove('selected-row');
             } else {
-                selectedRows.add(rowId);
+                previewSelectedRows.add(rowId);
                 checkmark.classList.add('visible');
                 tr.classList.add('selected-row');
+            }
+        }
+
+        async function appendSelectedRows() {
+            if (previewSelectedRows.size === 0) {
+                alert('กรุณาเลือกแถวที่ต้องการเพิ่มลงไฟล์อย่างน้อย 1 แถว');
+                return;
+            }
+            if (!window.currentPreviewData) {
+                alert('ไม่มีข้อมูลพรีวิว');
+                return;
+            }
+
+            const rowsToAppend = [];
+            previewSelectedRows.forEach(idxStr => {
+                const idx = parseInt(idxStr, 10);
+                if (!isNaN(idx) && window.currentPreviewData[idx]) {
+                    rowsToAppend.push(window.currentPreviewData[idx]);
+                }
+            });
+
+            if (rowsToAppend.length === 0) return;
+
+            const filename = window.currentFilename || 'students.xlsx';
+            
+            const overlay = document.getElementById('processing-overlay');
+            const stepTxt = document.getElementById('processing-step');
+            overlay.classList.add('active');
+            stepTxt.textContent = 'กำลังเพิ่มแถวที่เลือกลงในไฟล์...';
+
+            try {
+                const res = await fetch('/api/append_rows', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        file: filename,
+                        rows: rowsToAppend
+                    })
+                });
+                const resData = await res.json();
+                overlay.classList.remove('active');
+                if (resData.status === 'success') {
+                    addMsg('bot', `เพิ่มข้อมูลจำนวน ${rowsToAppend.length} แถวลงไฟล์ ${filename} เรียบร้อยแล้ว!`);
+                    previewSelectedRows.clear();
+                    // Update preview display
+                    document.querySelectorAll('#preview-body tr').forEach(tr => {
+                        tr.classList.remove('selected-row');
+                        const check = tr.querySelector('.select-check');
+                        if (check) check.classList.remove('visible');
+                    });
+                } else {
+                    addMsg('bot', `เกิดข้อผิดพลาดในการเพิ่มข้อมูล: ${resData.message}`);
+                }
+            } catch (err) {
+                overlay.classList.remove('active');
+                addMsg('bot', `ไม่สามารถเชื่อมต่อเพื่อเพิ่มข้อมูลได้: ${err.message}`);
             }
         }
 
@@ -726,6 +875,12 @@
                 const res  = await fetch('/upload', { method: 'POST', body: formData });
                 const data = await res.json();
                 addMsg('bot', data.message || 'Upload complete');
+                if (data.filename) {
+                    window.currentFilename = data.filename;
+                } else {
+                    window.currentFilename = file.name;
+                }
+                if (data.preview) updatePreview(data.preview);
             } catch (e) { addMsg('bot', 'Upload failed: ' + e.message); }
         });
 
@@ -813,6 +968,10 @@
             if (e.key === 'Enter' && typeof $ !== 'undefined' && $.fn.DataTable.isDataTable('#students-table'))
                 $('#students-table').DataTable().ajax.reload();
         });
+
+        // ── Initial setup on page load ──
+        loadPersistedLiveLogs();
+        renderCommandHistory();
     </script>
 
     <!-- jQuery + DataTables (loaded last so DOM is ready) -->
