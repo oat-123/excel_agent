@@ -260,6 +260,31 @@ def api_students():
         "data": page_data,
     })
 
+# New API: append multiple rows (only the selected rows from UI)
+@app.route('/api/append_rows', methods=['POST'])
+def api_append_rows():
+    payload = request.json or {}
+    filename = payload.get('file', 'students.xlsx')
+    rows = payload.get('rows', [])
+    results = []
+    try:
+        from tools.excel_tools import append_row
+        for r in rows:
+            # Ensure we only keep columns A-J (first 10 keys) if dict; otherwise pass through
+            if isinstance(r, dict):
+                # Keep only first 10 keys in insertion order
+                filtered = {}
+                for i, k in enumerate(list(r.keys())):
+                    if i >= 10: break
+                    filtered[k] = r[k]
+                r = filtered
+            res = append_row({"file": filename, "data": r})
+            results.append(res)
+        return jsonify({"status": "success", "results": results})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 def get_project_size():
     total_size = 0
     for dirpath, dirnames, filenames in os.walk("."):
