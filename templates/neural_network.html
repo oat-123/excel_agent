@@ -251,6 +251,14 @@
     </div><!-- /.interface-overlay -->
 
     <script src="{{ url_for('static', filename='js/neural_network.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/neural_network_patch.js') }}"></script>
+    <style>
+    /* Small insert button for thought stream lines */
+    .insert-log-btn {
+        background: transparent; border: 1px solid rgba(0,242,255,0.08); color: var(--primary); padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 12px;
+    }
+    .insert-log-btn:hover { background: rgba(0,242,255,0.08); }
+    </style>
     <script>
         // ── Real Network Metrics ──────────────────────────────────────────
         let _pingHistory = [];

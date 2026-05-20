@@ -83,7 +83,7 @@ def append_row_live(filename, data):
     """
     Append row into opened Excel workbook with realtime visual update
     and preserve previous row formatting.
-    Only include columns A-J (จนถึง เบอร์โทรศัพท์).
+    Only include columns A-J (จนถึง หมายเหตุ).
     Column A (ลำดับ) auto-generates Thai numerals.
     """
     pythoncom.CoInitialize()
@@ -131,12 +131,12 @@ def append_row_live(filename, data):
         sheet.Rows(last_row).Copy()
         sheet.Rows(target_row).PasteSpecial(-4122)   # xlPasteFormats
 
-        # กรองเฉพาะข้อมูล columns A-J (9 columns)
-        # ลำดับ, ยศ, ชื่อ, สกุล, ชั้นปีที่, ตอน, ตำแหน่ง, สังกัด, เบอร์โทรศัพท์
-        values = list(data.values())[:9]
+        # กรองเฉพาะข้อมูล columns A-J (10 columns)
+        # ลำดับ, ยศ, ชื่อ, สกุล, ชั้นปีที่, ตอน, ตำแหน่ง, สังกัด, เบอร์โทรศัพท์, หมายเหตุ
+        values = list(data.values())[:10]
 
         # col_idx = 1 = ลำดับ (auto-generate Thai numerals)
-        # col_idx = 2-9 = other fields from data
+        # col_idx = 2-10 = other fields from data
         
         # Count existing rows to auto-generate sequence number
         data_start_row = 4  # Assume data starts at row 4 (after header)
@@ -170,6 +170,7 @@ def append_row_live(filename, data):
             7: "ตำแหน่ง",
             8: "สังกัด",
             9: "เบอร์โทรศัพท์",
+            10: "หมายเหตุ",
         }
 
         for i, value in enumerate(values[1:] if len(values) > 1 else [], start=2):
@@ -247,8 +248,8 @@ def ensure_file_path(command_file=None):
     return {"filename": requested_file, "exists": False, "suggestion": None, "path": full_path}
 
 
-STUDENT_BASE_COLS = ["ลำดับ", "ยศ", "ชื่อ", "สกุล", "ชั้นปีที่", "ตอน", "ตำแหน่ง", "สังกัด", "เบอร์โทรศัพท์"]
-# Export to Excel: columns A–I (ลำดับ … เบอร์โทรศัพท์)
+STUDENT_BASE_COLS = ["ลำดับ", "ยศ", "ชื่อ", "สกุล", "ชั้นปีที่", "ตอน", "ตำแหน่ง", "สังกัด", "เบอร์โทรศัพท์", "หมายเหตุ"]
+# Export to Excel: columns A–J (ลำดับ … หมายเหตุ)
 STUDENT_SHEET_EXPORT_COLS = STUDENT_BASE_COLS
 
 HEADER_ROW_1BASE = 3
@@ -272,7 +273,7 @@ def _sheet_font(bold=False):
 
 
 def slim_to_export_columns(df):
-    """Keep only student columns (A–I); missing columns become empty."""
+    """Keep only student columns (A–J); missing columns become empty."""
     if df is None or len(df) == 0:
         return pd.DataFrame(columns=STUDENT_SHEET_EXPORT_COLS)
     out = pd.DataFrame()
@@ -565,7 +566,7 @@ def search_excel(command):
     if _use_student_layout_on_save(hi, file_info["filename"]):
         df = slim_to_export_columns(df)
     # Filter to only A-J columns
-    df = df.iloc[:, :9]
+    df = df.iloc[:, :10]
     result = df[df.astype(str).apply(lambda row: row.str.contains(keyword, case=False).any(), axis=1)]
     return {"status": "success", "rows": result.fillna("").to_dict(orient="records")}
 
@@ -578,7 +579,7 @@ def copy_data(command):
     use_layout = _use_student_layout_on_save(hi, file_info["filename"])
     if use_layout:
         df = slim_to_export_columns(df)
-    df = df.iloc[:, :9]  # Limit to A-J
+    df = df.iloc[:, :10]  # Limit to A-J
     dest_path = os.path.join(DATA_FOLDER, dest_file)
     dest_title = os.path.splitext(dest_file)[0]
     if use_layout:
@@ -602,8 +603,8 @@ def merge_files(command):
     if use_layout:
         df1 = slim_to_export_columns(df1)
         df2 = slim_to_export_columns(df2)
-    df1 = df1.iloc[:, :9]
-    df2 = df2.iloc[:, :9]
+    df1 = df1.iloc[:, :10]
+    df2 = df2.iloc[:, :10]
     merged = pd.concat([df1, df2], ignore_index=True)
     title_text = os.path.splitext(file_info["filename"])[0]
     if use_layout:
@@ -620,7 +621,7 @@ def convert_format(command):
     hi, df = read_dataframe_with_header(filename, command.get("sheet", "Sheet1"))
     if _use_student_layout_on_save(hi, file_info["filename"]):
         df = slim_to_export_columns(df)
-    df = df.iloc[:, :9]  # Limit to A-J
+    df = df.iloc[:, :10]  # Limit to A-J
     base_name = file_info["filename"].replace(".xlsx", "")
     output_file = f"{base_name}.{output_format}"
     output_path = os.path.join(DATA_FOLDER, output_file)
@@ -637,7 +638,7 @@ def summarize_data(command):
     hi, df = read_dataframe_with_header(filename, command.get("sheet", "Sheet1"))
     if _use_student_layout_on_save(hi, file_info["filename"]):
         df = slim_to_export_columns(df)
-    df = df.iloc[:, :9]  # Limit to A-J
+    df = df.iloc[:, :10]  # Limit to A-J
     summary = {"total_rows": len(df), "columns": list(df.columns), "text_summary": {}}
     for col in df.select_dtypes(include=['object']).columns[:5]:
         summary["text_summary"][col] = {"unique_values": int(df[col].nunique())}
@@ -650,7 +651,7 @@ def get_statistics(command):
     hi, df = read_dataframe_with_header(filename, command.get("sheet", "Sheet1"))
     if _use_student_layout_on_save(hi, file_info["filename"]):
         df = slim_to_export_columns(df)
-    df = df.iloc[:, :9]  # Limit to A-J
+    df = df.iloc[:, :10]  # Limit to A-J
     stats = {"row_count": len(df), "missing_data": {}}
     for col in df.columns:
         missing = df[col].isna().sum()
@@ -700,8 +701,8 @@ def analyze_file_structure(filepath):
     analysis = {"file_path": filepath, "sheets": []}
     for name in excel_file.sheet_names:
         df = pd.read_excel(filepath, sheet_name=name)
-        df = df.iloc[:, :9]  # Limit to A-J
-        analysis["sheets"].append({"name": name, "rows": len(df), "column_info": [{"name": str(c)} for c in df.columns[:9]]})
+        df = df.iloc[:, :10]  # Limit to A-J
+        analysis["sheets"].append({"name": name, "rows": len(df), "column_info": [{"name": str(c)} for c in df.columns[:10]]})
     return analysis
 
 def detect_patterns_and_relationships(analysis):
@@ -724,7 +725,7 @@ def export_to_csv(command):
     if not os.path.exists(filename): return {"error": "file not found"}
     hi, df = read_dataframe_with_header(filename, command.get("sheet", "Sheet1"))
     df = slim_to_export_columns(df)
-    df = df.iloc[:, :9]  # Limit to A-J
+    df = df.iloc[:, :10]  # Limit to A-J
     base_name = file_info["filename"].replace(".xlsx", "")
     output_file = f"{base_name}.csv"
     output_path = os.path.join(DATA_FOLDER, output_file)
@@ -738,7 +739,7 @@ def export_to_html(command):
     if not os.path.exists(filename): return {"error": "file not found"}
     hi, df = read_dataframe_with_header(filename, command.get("sheet", "Sheet1"))
     df = slim_to_export_columns(df)
-    df = df.iloc[:, :9]  # Limit to A-J
+    df = df.iloc[:, :10]  # Limit to A-J
     base_name = file_info["filename"].replace(".xlsx", "")
     output_file = f"{base_name}.html"
     output_path = os.path.join(DATA_FOLDER, output_file)
@@ -756,7 +757,7 @@ def export_dashboard(command):
     if not os.path.exists(filename): return {"error": "file not found"}
     hi, df = read_dataframe_with_header(filename, command.get("sheet", "Sheet1"))
     df = slim_to_export_columns(df)
-    df = df.iloc[:, :9]  # Limit to A-J
+    df = df.iloc[:, :10]  # Limit to A-J
     
     dashboard = {
         "total_records": len(df),

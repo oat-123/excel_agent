@@ -269,10 +269,17 @@ def api_append_rows():
     results = []
     try:
         from tools.excel_tools import append_row
+        # Security: Only append rows that have been explicitly selected by the UI.
+        # Each row should include a special key 'selected' or the client should only send selected rows.
         for r in rows:
+            if isinstance(r, dict) and not r.get('__selected') and not r.get('selected'):
+                # skip rows not explicitly marked as selected
+                continue
             # Ensure we only keep columns A-J (first 10 keys) if dict; otherwise pass through
             if isinstance(r, dict):
-                # Keep only first 10 keys in insertion order
+                # Remove selection markers before writing
+                r.pop('__selected', None)
+                r.pop('selected', None)
                 filtered = {}
                 for i, k in enumerate(list(r.keys())):
                     if i >= 10: break
@@ -280,6 +287,8 @@ def api_append_rows():
                 r = filtered
             res = append_row({"file": filename, "data": r})
             results.append(res)
+        if not results:
+            return jsonify({"status": "error", "message": "No selected rows provided to append."}), 400
         return jsonify({"status": "success", "results": results})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
