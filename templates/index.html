@@ -6,6 +6,7 @@
     <title>J.A.R.V.I.S - AI Assistant</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.tailwindcss.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --neural-blue: #00f2ff;
@@ -215,6 +216,7 @@
             border-top: 3px solid var(--accent-color); border-radius: 50%;
             animation: spin 1s linear infinite; position: relative;
         }
+        <div id="dna-lottie" style="width:100px;height:100px;display:flex;align-items:center;justify-content:center;"></div>        }
         .dna-loader::after {
             content: ''; position: absolute; inset: 10px;
             border: 3px solid transparent; border-bottom: 3px solid var(--neural-purple);
@@ -263,7 +265,8 @@
         }
 
         /* Responsive */
-        @media (max-width: 1024px) { .preview-section.expanded { width: 350px; } .chat-section { min-width: 300px; } }
+        @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+@media (max-width: 1024px) { .preview-section.expanded { width: 350px; } .chat-section { min-width: 300px; } }
         @media (max-width: 768px) {
             .main-container { flex-direction: column; padding: 10px; padding-top: 65px; }
             .mode-toggle { top: 10px; right: 10px; padding: 6px 12px; }
@@ -280,12 +283,14 @@
             .mode-toggle { top: 8px; right: 8px; padding: 5px 10px; }
         }
     </style>
+<script src="https://cdn.jsdelivr.net/npm/tsparticles@2/tsparticles.bundle.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.10.2/lottie.min.js" defer></script>
 </head>
 <body>
 
     <!-- ── Single Toggle (top-right corner) ── -->
     <!-- Neural = checked/active, Chat = unchecked -->
-    <div class="mode-toggle" onclick="toggleMode()" title="สลับโหมด Neural / Chat">
+    <div class="mode-toggle" aria-label="Toggle neural/chat mode" onclick="toggleMode()" title="สลับโหมด Neural / Chat">
         <span class="mode-toggle-icon">🧠</span>
         <label class="toggle-switch" style="pointer-events:none;">
             <input type="checkbox" id="mode-switch" checked>
@@ -293,6 +298,8 @@
         </label>
         <span class="mode-toggle-text" id="mode-label">NEURAL</span>
     </div>
+<div id="particles-container" style="position:fixed;inset:0;z-index:8000;pointer-events:none;"></div>
+
 
     <!-- Neural Network Interface — DEFAULT (active) -->
     <div id="neural-container" class="active">
@@ -324,7 +331,7 @@
                     <div class="input-box" style="position:relative;">
                         <div id="autocomplete-box" class="autocomplete-box"></div>
                         <input type="file" id="file-upload" accept=".xlsx,.xls,.csv,.json" style="display:none;">
-                        <button class="upload-btn" onclick="document.getElementById('file-upload').click()">
+                        <button class="upload-btn" aria-label="Upload file" onclick="document.getElementById('file-upload').click()">
                             <i class="fas fa-upload"></i> อัพโหลด
                         </button>
                         <input type="text" id="cmd-input" placeholder="ป้อนคำสั่ง..." autocomplete="off"
@@ -417,12 +424,26 @@
 
     <!-- Processing Overlay -->
     <div class="processing-overlay" id="processing-overlay">
-        <div class="dna-loader"></div>
+        <div id="dna-lottie" style="width:100px;height:100px;display:flex;align-items:center;justify-content:center;"></div>
         <div class="processing-text" id="processing-step">ANALYZING NEURAL DATA...</div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+// Lazy-load init scripts for particles and Lottie when DOM ready or neural mode active
+(function(){
+    function loadScript(url){
+        return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=url; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+    }
+    async function initVisuals(){
+        try { await loadScript('/static/js/init_particles.js'); await loadScript('/static/js/init_lottie.js'); }
+        catch(e){ console.warn('Visual init failed', e); }
+    }
+    document.addEventListener('DOMContentLoaded',()=>{ setTimeout(initVisuals,1500); });
+    window.addEventListener('click', (e)=>{ if(e.target.closest('.mode-toggle')) initVisuals(); });
+})();
+</script>
+<script>
 
         // ── Mode Toggle ──────────────────────────────────────────────────
         // checked  = Neural mode (default)
